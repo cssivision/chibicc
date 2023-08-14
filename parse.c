@@ -198,10 +198,27 @@ Node *expr(Token **rest, Token *tok)
     return equality(rest, tok);
 }
 
+// expr-stmt = expr ";"
+static Node *expr_stmt(Token **rest, Token *tok)
+{
+    Node *node = new_unary(ND_EXPR_STMT, expr(&tok, tok));
+    *rest = skip(tok, ";");
+    return node;
+}
+
+// stmt = expr-stmt
+static Node *stmt(Token **rest, Token *tok)
+{
+    return expr_stmt(rest, tok);
+}
+
 Node *parse(Token *tok)
 {
-    Node *node = expr(&tok, tok);
-    if (tok->kind != TK_EOF)
-        error_tok(tok, "extra token");
-    return node;
+    Node head = {};
+    Node *cur = &head;
+    while (tok->kind != TK_EOF)
+    {
+        cur = cur->next = stmt(&tok, tok);
+    }
+    return head.next;
 }
