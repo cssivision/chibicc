@@ -9,6 +9,7 @@
 typedef enum
 {
     TK_PUNCT,
+    TK_IDENT,
     TK_NUM,
     TK_EOF,
 } TokenKind;
@@ -35,8 +36,10 @@ typedef enum
     ND_NE,        // !=
     ND_LT,        // <
     ND_LE,        // <=
+    ND_ASSIGN,    // =
     ND_EXPR_STMT, // Expression statement
-    ND_NUM,       // Integer
+    ND_VAR,       // Variable
+    ND_NUM        // Integer
 } NodeKind;
 
 typedef struct Node Node;
@@ -47,6 +50,7 @@ struct Node
     Node *lhs;
     Node *rhs;
     int val;
+    char name;
 };
 
 void error(char *fmt, ...);
