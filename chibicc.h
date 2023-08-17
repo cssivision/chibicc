@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include "stdio.h"
 #include "stdarg.h"
 #include "stdlib.h"
@@ -42,6 +43,15 @@ typedef enum
     ND_NUM        // Integer
 } NodeKind;
 
+// Local variable
+typedef struct Obj Obj;
+struct Obj
+{
+    Obj *next;
+    char *name; // Variable name
+    int offset; // Offset from RBP
+};
+
 typedef struct Node Node;
 struct Node
 {
@@ -49,12 +59,20 @@ struct Node
     Node *next;
     Node *lhs;
     Node *rhs;
-    int val;
-    char name;
+    int val;  // Used if kind == ND_NUM
+    Obj *var; // Used if kind == ND_VAR
+};
+
+typedef struct Function Function;
+struct Function
+{
+    Node *body;
+    Obj *locals;
+    int stack_size;
 };
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
 Token *tokenize(char *p);
-Node *parse(Token *tok);
-void codegen(Node *node);
+Function *parse(Token *tok);
+void codegen(Function *prog);

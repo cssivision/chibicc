@@ -1,5 +1,9 @@
 #include "chibicc.h"
 
+// All local variable instances created during parsing are
+// accumulated to this list.
+Obj *locals;
+
 Node *expr(Token **rest, Token *tok);
 
 bool equal(Token *tok, char *p)
@@ -32,7 +36,9 @@ Node *new_unary(NodeKind kind, Node *expr)
 Token *skip(Token *tok, char *op)
 {
     if (!equal(tok, op))
+    {
         error_tok(tok, "expected '%s'", op);
+    }
     return tok->next;
 }
 
@@ -43,11 +49,32 @@ Node *new_num(int val)
     return node;
 }
 
-Node *new_var_node(char name)
+Node *new_var_node(Obj *var)
 {
     Node *node = new_node(ND_VAR);
-    node->name = name;
+    node->var = var;
     return node;
+}
+
+Obj *find_var(Token *tok)
+{
+    for (Obj *var = locals; var; var = var->next)
+    {
+        if (strlen(var->name) == tok->len && strncmp(var->name, tok->loc, tok->len) == 0)
+        {
+            return var;
+        }
+    }
+    return NULL;
+}
+
+Obj *new_lvar(char *name)
+{
+    Obj *var = calloc(1, sizeof(Obj));
+    var->name = name;
+    var->next = locals;
+    locals = var;
+    return var;
 }
 
 // primary = "(" expr ")" | ident | num
@@ -69,9 +96,13 @@ Node *primary(Token **rest, Token *tok)
 
     if (tok->kind == TK_IDENT)
     {
-        Node *node = new_var_node(*tok->loc);
+        Obj *var = find_var(tok);
+        if (!var)
+        {
+            var = new_lvar(strndup(tok->loc, tok->len));
+        }
         *rest = tok->next;
-        return node;
+        return new_var_node(var);
     }
 
     error_tok(tok, "expected an expression");
@@ -238,7 +269,7 @@ static Node *stmt(Token **rest, Token *tok)
     return expr_stmt(rest, tok);
 }
 
-Node *parse(Token *tok)
+Function *parse(Token *tok)
 {
     Node head = {};
     Node *cur = &head;
@@ -246,5 +277,8 @@ Node *parse(Token *tok)
     {
         cur = cur->next = stmt(&tok, tok);
     }
-    return head.next;
+    Function *prog = calloc(1, sizeof(Function));
+    prog->body = head.next;
+    prog->locals = locals;
+    return prog;
 }
