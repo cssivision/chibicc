@@ -273,8 +273,25 @@ static Node *expr_stmt(Token **rest, Token *tok)
 //      | expr-stmt
 //      | "{" stmt* "}"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
+//      | "for" "(" expr-stmt expr-stmt expr? ")" stmt
 static Node *stmt(Token **rest, Token *tok)
 {
+    if (equal(tok, "for"))
+    {
+        Node *node = new_node(ND_FOR);
+        tok = skip(tok->next, "(");
+        node->init = expr_stmt(&tok, tok);
+        node->cond = expr_stmt(&tok, tok);
+        if (!equal(tok, ")"))
+        {
+            node->inc = expr(&tok, tok);
+        }
+        tok = skip(tok, ")");
+        node->then = stmt(&tok, tok);
+        *rest = tok;
+        return node;
+    }
+
     if (equal(tok, "if"))
     {
         Node *node = new_node(ND_IF);

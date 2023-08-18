@@ -42,6 +42,7 @@ typedef enum
     ND_RETURN,    // return
     ND_BLOCK,     // { .. }
     ND_IF,        // if
+    ND_FOR,       // for
     ND_EXPR_STMT, // Expression statement
     ND_VAR,       // Variable
     ND_NUM        // Integer
@@ -70,10 +71,12 @@ struct Node
 
     Obj *var; // Used if kind == ND_VAR
 
-    // "if" statement
+    // "if" or "for" statement
     Node *cond;
     Node *then;
     Node *els;
+    Node *init;
+    Node *inc;
 };
 
 typedef struct Function Function;
