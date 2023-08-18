@@ -95,9 +95,14 @@ void gen_expr(Node *node)
 
 static void gen_stmt(Node *node)
 {
-    if (node->kind == ND_EXPR_STMT)
+    switch (node->kind)
     {
+    case ND_EXPR_STMT:
         gen_expr(node->lhs);
+        return;
+    case ND_RETURN:
+        gen_expr(node->lhs);
+        printf("  jmp .L.return\n");
         return;
     }
 
@@ -131,6 +136,7 @@ void codegen(Function *prog)
         assert(depth == 0);
     }
 
+    printf(".L.return:\n");
     printf("  mov %%rbp, %%rsp\n");
     printf("  pop %%rbp\n");
     printf("  ret\n");

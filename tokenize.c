@@ -61,6 +61,17 @@ bool is_ident2(char c)
     return is_ident1(c) || ('0' <= c && c <= '9');
 }
 
+void convert_keywords(Token *tok)
+{
+    for (Token *t = tok; t->kind != TK_EOF; t = tok->next)
+    {
+        if (equal(t, "return"))
+        {
+            t->kind = TK_KEYWORD;
+        }
+    }
+}
+
 Token *tokenize(char *p)
 {
     current_input = p;
@@ -85,6 +96,7 @@ Token *tokenize(char *p)
             continue;
         }
 
+        // Identifier or keyword
         if (is_ident1(*p))
         {
             char *start = p;

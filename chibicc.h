@@ -12,6 +12,7 @@ typedef enum
     TK_PUNCT,
     TK_IDENT,
     TK_NUM,
+    TK_KEYWORD,
     TK_EOF,
 } TokenKind;
 
@@ -38,6 +39,7 @@ typedef enum
     ND_LT,        // <
     ND_LE,        // <=
     ND_ASSIGN,    // =
+    ND_RETURN,    // return
     ND_EXPR_STMT, // Expression statement
     ND_VAR,       // Variable
     ND_NUM        // Integer
@@ -73,6 +75,9 @@ struct Function
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
+
+bool equal(Token *tok, char *p);
+
 Token *tokenize(char *p);
 Function *parse(Token *tok);
 void codegen(Function *prog);
