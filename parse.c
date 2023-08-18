@@ -255,9 +255,15 @@ Node *expr(Token **rest, Token *tok)
     return assign(rest, tok);
 }
 
-// expr-stmt = expr ";"
+// expr-stmt = expr? ";"
 static Node *expr_stmt(Token **rest, Token *tok)
 {
+    if (equal(tok, ";"))
+    {
+        tok = tok->next;
+        *rest = tok;
+        return new_node(ND_BLOCK);
+    }
     Node *node = new_unary(ND_EXPR_STMT, expr(&tok, tok));
     *rest = skip(tok, ";");
     return node;
