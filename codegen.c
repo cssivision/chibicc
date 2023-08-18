@@ -97,6 +97,12 @@ static void gen_stmt(Node *node)
 {
     switch (node->kind)
     {
+    case ND_BLOCK:
+        for (Node *n = node->body; n; n = n->next)
+        {
+            gen_stmt(n);
+        }
+        return;
     case ND_EXPR_STMT:
         gen_expr(node->lhs);
         return;
@@ -109,6 +115,13 @@ static void gen_stmt(Node *node)
     error("invalid statement");
 }
 
+// Round up `n` to the nearest multiple of `align`. For instance,
+// align_to(5, 8) returns 8 and align_to(11, 8) returns 16.
+static int align_to(int n, int align)
+{
+    return (n + align - 1) / align * align;
+}
+
 void assign_lvar_offsets(Function *prog)
 {
     int offset;
@@ -117,7 +130,7 @@ void assign_lvar_offsets(Function *prog)
         offset += 8;
         var->offset = -offset;
     }
-    prog->stack_size = offset;
+    prog->stack_size = align_to(offset, 16);
 }
 
 void codegen(Function *prog)

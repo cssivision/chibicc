@@ -40,6 +40,7 @@ typedef enum
     ND_LE,        // <=
     ND_ASSIGN,    // =
     ND_RETURN,    // return
+    ND_BLOCK,     // { .. }
     ND_EXPR_STMT, // Expression statement
     ND_VAR,       // Variable
     ND_NUM        // Integer
@@ -61,8 +62,9 @@ struct Node
     Node *next;
     Node *lhs;
     Node *rhs;
-    int val;  // Used if kind == ND_NUM
-    Obj *var; // Used if kind == ND_VAR
+    Node *body; // use if kind == ND_BLOCK
+    int val;    // Used if kind == ND_NUM
+    Obj *var;   // Used if kind == ND_VAR
 };
 
 typedef struct Function Function;

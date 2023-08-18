@@ -265,12 +265,28 @@ static Node *expr_stmt(Token **rest, Token *tok)
 
 // stmt = "return" expr ";"
 //      | expr-stmt
+//      | "{" stmt* "}"
 static Node *stmt(Token **rest, Token *tok)
 {
     if (equal(tok, "return"))
     {
         Node *node = new_unary(ND_RETURN, expr(&tok, tok->next));
         tok = skip(tok, ";");
+        *rest = tok;
+        return node;
+    }
+    if (equal(tok, "{"))
+    {
+        Node head = {};
+        Node *cur = &head;
+        tok = tok->next;
+        while (!equal(tok, "}"))
+        {
+            cur = cur->next = stmt(&tok, tok);
+        }
+        tok = skip(tok, "}");
+        Node *node = new_node(ND_BLOCK);
+        node->body = head.next;
         *rest = tok;
         return node;
     }
