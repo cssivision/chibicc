@@ -42,7 +42,7 @@ typedef enum
     ND_RETURN,    // return
     ND_BLOCK,     // { .. }
     ND_IF,        // if
-    ND_FOR,       // for
+    ND_FOR,       // for or while
     ND_EXPR_STMT, // Expression statement
     ND_VAR,       // Variable
     ND_NUM        // Integer
