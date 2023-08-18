@@ -61,11 +61,24 @@ bool is_ident2(char c)
     return is_ident1(c) || ('0' <= c && c <= '9');
 }
 
+bool is_keywords(Token *tok)
+{
+    static char *kw[] = {"return", "if", "else"};
+    for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
+    {
+        if (equal(tok, kw[i]))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void convert_keywords(Token *tok)
 {
-    for (Token *t = tok; t->kind != TK_EOF; t = tok->next)
+    for (Token *t = tok; t->kind != TK_EOF; t = t->next)
     {
-        if (equal(t, "return"))
+        if (is_keywords(t))
         {
             t->kind = TK_KEYWORD;
         }
@@ -120,6 +133,7 @@ Token *tokenize(char *p)
     }
 
     cur = cur->next = new_token(TK_EOF, p, p);
+    convert_keywords(head.next);
     return head.next;
 }
 
