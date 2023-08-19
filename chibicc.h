@@ -7,6 +7,8 @@
 #include "stdbool.h"
 #include "assert.h"
 
+typedef struct Type Type;
+
 typedef enum
 {
     TK_PUNCT,
@@ -29,25 +31,26 @@ struct Token
 
 typedef enum
 {
-    ND_ADD,       // +
-    ND_SUB,       // -
-    ND_MUL,       // *
-    ND_DIV,       // /
-    ND_NEG,       // unary -
-    ND_EQ,        // ==
-    ND_NE,        // !=
-    ND_LT,        // <
-    ND_LE,        // <=
-    ND_ASSIGN,    // =
-    ND_RETURN,    // return
-    ND_BLOCK,     // { .. }
-    ND_IF,        // if
-    ND_FOR,       // for or while
-    ND_EXPR_STMT, // Expression statement
-    ND_VAR,       // Variable
-    ND_ADDR,      // &
-    ND_DEREF,     // *
-    ND_NUM        // Integer
+    ND_ADD,    // +
+    ND_SUB,    // -
+    ND_MUL,    // *
+    ND_DIV,    // /
+    ND_NEG,    // unary -
+    ND_EQ,     // ==
+    ND_NE,     // !=
+    ND_LT,     // <
+    ND_LE,     // <=
+    ND_ASSIGN, // =
+    ND_ADDR,   // &
+    ND_DEREF,  // *
+    ND_NUM,    // Integer
+    ND_VAR,    // Variable
+
+    ND_RETURN,   // return
+    ND_BLOCK,    // { .. }
+    ND_IF,       // if
+    ND_FOR,      // for or while
+    ND_EXPR_STMT // Expression statement
 } NodeKind;
 
 // Local variable
@@ -64,6 +67,7 @@ struct Node
 {
     NodeKind kind;
     Node *next;
+    Type *ty;
     Token *tok; // Representative token
     Node *lhs;
     Node *rhs;
@@ -89,6 +93,22 @@ struct Function
     Obj *locals;
     int stack_size;
 };
+
+typedef enum
+{
+    TY_INT,
+    TY_PTR,
+} TypeKind;
+
+struct Type
+{
+    TypeKind kind;
+    Type *base;
+};
+
+bool is_integer(Type *ty);
+void add_type(Node *node);
+extern Type *ty_int;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
