@@ -45,6 +45,8 @@ typedef enum
     ND_FOR,       // for or while
     ND_EXPR_STMT, // Expression statement
     ND_VAR,       // Variable
+    ND_ADDR,      // &
+    ND_DEREF,     // *
     ND_NUM        // Integer
 } NodeKind;
 
@@ -62,6 +64,7 @@ struct Node
 {
     NodeKind kind;
     Node *next;
+    Token *tok; // Representative token
     Node *lhs;
     Node *rhs;
 
