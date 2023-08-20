@@ -69,11 +69,12 @@ Obj *find_var(Token *tok)
     return NULL;
 }
 
-Obj *new_lvar(char *name)
+Obj *new_lvar(char *name, Type *ty)
 {
     Obj *var = calloc(1, sizeof(Obj));
     var->name = name;
     var->next = locals;
+    var->ty = ty;
     locals = var;
     return var;
 }
@@ -100,7 +101,7 @@ Node *primary(Token **rest, Token *tok)
         Obj *var = find_var(tok);
         if (!var)
         {
-            var = new_lvar(strndup(tok->loc, tok->len));
+            error_tok(tok, "undefined variable");
         }
         *rest = tok->next;
         return new_var_node(var, tok);
@@ -355,9 +356,78 @@ static Node *expr_stmt(Token **rest, Token *tok)
     return node;
 }
 
+// declspec = "int"
+Type *declspec(Token **rest, Token *tok)
+{
+    tok = skip(tok, "int");
+    *rest = tok;
+    return ty_int;
+}
+
+// declarator "*"* ident
+Type *declarator(Token **rest, Token *tok, Type *ty)
+{
+    while (consume(&tok, tok, "*"))
+    {
+        ty = pointer_to(ty);
+    }
+
+    if (tok->kind != TK_IDENT)
+    {
+        error_tok(tok, "expected a variable name");
+    }
+    ty->name = tok;
+    *rest = tok->next;
+    return ty;
+}
+
+static char *get_ident(Token *tok)
+{
+    if (tok->kind != TK_IDENT)
+    {
+        error_tok(tok, "expected an identifier");
+    }
+    return strndup(tok->loc, tok->len);
+}
+
+// declaration = declspec declarator ("=" expr)? (",", declarator ("=" expr)?)* ";"
+Node *declaration(Token **rest, Token *tok)
+{
+    Type *basety = declspec(&tok, tok);
+
+    Node head = {};
+    Node *cur = &head;
+
+    int i = 0;
+    while (!equal(tok, ";"))
+    {
+        if (i++ > 0)
+        {
+            tok = skip(tok, ",");
+        }
+
+        Type *ty = declarator(&tok, tok, basety);
+        Obj *var = new_lvar(get_ident(ty->name), ty);
+
+        if (!equal(tok, "="))
+        {
+            continue;
+        }
+
+        Node *lhs = new_var_node(var, ty->name);
+        Node *rhs = expr(&tok, tok->next);
+        Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
+        cur = cur->next = new_unary(ND_EXPR_STMT, node, tok);
+    }
+    Node *node = new_node(ND_BLOCK, tok);
+    node->body = head.next;
+    *rest = tok->next;
+    return node;
+}
+
 // stmt = "return" expr ";"
 //      | expr-stmt
-//      | "{" stmt* "}"
+//      | "{" declaration | stmt* "}"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "for" "(" expr-stmt expr? ";" expr? ")" stmt
 //      | "while" "(" expr ")" stmt
@@ -426,7 +496,14 @@ static Node *stmt(Token **rest, Token *tok)
         tok = tok->next;
         while (!equal(tok, "}"))
         {
-            cur = cur->next = stmt(&tok, tok);
+            if (equal(tok, "int"))
+            {
+                cur = cur->next = declaration(&tok, tok);
+            }
+            else
+            {
+                cur = cur->next = stmt(&tok, tok);
+            }
         }
         tok = skip(tok, "}");
         node->body = head.next;

@@ -8,6 +8,9 @@
 #include "assert.h"
 
 typedef struct Type Type;
+typedef struct Token Token;
+typedef struct Obj Obj;
+typedef struct Node Node;
 
 typedef enum
 {
@@ -17,8 +20,6 @@ typedef enum
     TK_KEYWORD,
     TK_EOF,
 } TokenKind;
-
-typedef struct Token Token;
 
 struct Token
 {
@@ -54,15 +55,14 @@ typedef enum
 } NodeKind;
 
 // Local variable
-typedef struct Obj Obj;
 struct Obj
 {
     Obj *next;
     char *name; // Variable name
+    Type *ty;
     int offset; // Offset from RBP
 };
 
-typedef struct Node Node;
 struct Node
 {
     NodeKind kind;
@@ -104,16 +104,20 @@ struct Type
 {
     TypeKind kind;
     Type *base;
+    // Declaration
+    Token *name;
 };
 
 bool is_integer(Type *ty);
 void add_type(Node *node);
+Type *pointer_to(Type *base);
 extern Type *ty_int;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
 
 bool equal(Token *tok, char *p);
+bool consume(Token **rest, Token *tok, char *str);
 
 Token *tokenize(char *p);
 Function *parse(Token *tok);

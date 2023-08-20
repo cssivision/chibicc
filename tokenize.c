@@ -36,6 +36,17 @@ Token *new_token(TokenKind kind, char *start, char *end)
     return tok;
 }
 
+bool consume(Token **rest, Token *tok, char *str)
+{
+    if (equal(tok, str))
+    {
+        *rest = tok->next;
+        return true;
+    }
+    *rest = tok;
+    return false;
+}
+
 static bool startswith(char *p, char *q)
 {
     return strncmp(p, q, strlen(q)) == 0;
@@ -63,7 +74,7 @@ bool is_ident2(char c)
 
 bool is_keywords(Token *tok)
 {
-    static char *kw[] = {"return", "if", "else", "while"};
+    static char *kw[] = {"return", "if", "else", "while", "int"};
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
         if (equal(tok, kw[i]))
