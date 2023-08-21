@@ -76,6 +76,7 @@ struct Node
     Node *body; // use if kind == ND_BLOCK
 
     char *funcname;
+    Node *args;
 
     int val; // Used if kind == ND_NUM
 

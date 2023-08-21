@@ -4,6 +4,7 @@ void gen_addr(Node *node);
 void gen_expr(Node *node);
 
 static int depth;
+static char *argreg[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
 
 void push(void)
 {
@@ -64,9 +65,24 @@ void gen_expr(Node *node)
         printf("  mov %%rax, (%%rdi)\n");
         return;
     case ND_FUNCCALL:
+    {
+        int nargs = 0;
+        for (Node *n = node->args; n; n = n->next)
+        {
+            gen_expr(n);
+            push();
+            nargs++;
+        }
+
+        for (int i = nargs - 1; i >= 0; i--)
+        {
+            pop(argreg[i]);
+        }
+
         printf("  mov $0, %%rax\n");
         printf("  call %s\n", node->funcname);
         return;
+    }
     }
 
     gen_expr(node->rhs);

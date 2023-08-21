@@ -79,8 +79,33 @@ Obj *new_lvar(char *name, Type *ty)
     return var;
 }
 
-// primary = "(" expr ")" | ident args? | num
-// args = "(" ")"
+// funcall = ident "(" (expr ("," expr)*)? ")"
+Node *funccall(Token **rest, Token *tok)
+{
+    Node *node = new_node(ND_FUNCCALL, tok);
+    node->funcname = strndup(tok->loc, tok->len);
+    tok = tok->next;
+    tok = skip(tok, "(");
+
+    Node head = {};
+    Node *cur = &head;
+
+    int i = 0;
+    while (!equal(tok, ")"))
+    {
+        if (i++ > 0)
+        {
+            tok = skip(tok, ",");
+        }
+        cur = cur->next = expr(&tok, tok);
+    }
+    tok = skip(tok, ")");
+    node->args = head.next;
+    *rest = tok;
+    return node;
+}
+
+// primary = "(" expr ")" | ident func-args? | num
 Node *primary(Token **rest, Token *tok)
 {
     if (equal(tok, "("))
@@ -101,12 +126,9 @@ Node *primary(Token **rest, Token *tok)
     {
         if (equal(tok->next, "("))
         {
-            Node *node = new_node(ND_FUNCCALL, tok);
-            node->funcname = strndup(tok->loc, tok->len);
-            tok = skip(tok->next->next, ")");
-            *rest = tok;
-            return node;
+            return funccall(rest, tok);
         }
+
         Obj *var = find_var(tok);
         if (!var)
         {
@@ -399,7 +421,7 @@ static char *get_ident(Token *tok)
     return strndup(tok->loc, tok->len);
 }
 
-// declaration = declspec declarator ("=" expr)? (",", declarator ("=" expr)?)* ";"
+// declaration = declspec (declarator ("=" expr)? (",", declarator ("=" expr)?)*)? ";"
 Node *declaration(Token **rest, Token *tok)
 {
     Type *basety = declspec(&tok, tok);
