@@ -5,6 +5,7 @@
 Obj *locals;
 
 Node *expr(Token **rest, Token *tok);
+Node *compound_stmt(Token **rest, Token *tok);
 
 bool equal(Token *tok, char *p)
 {
@@ -395,7 +396,19 @@ Type *declspec(Token **rest, Token *tok)
     return ty_int;
 }
 
-// declarator "*"* ident
+// type-suffix = ("(" func-params)?
+Type *type_suffix(Token **rest, Token *tok, Type *ty)
+{
+    if (equal(tok, "("))
+    {
+        *rest = skip(tok->next, ")");
+        return func_type(ty);
+    }
+    *rest = tok;
+    return ty;
+}
+
+// declarator "*"* ident type-suffix
 Type *declarator(Token **rest, Token *tok, Type *ty)
 {
     while (consume(&tok, tok, "*"))
@@ -407,8 +420,10 @@ Type *declarator(Token **rest, Token *tok, Type *ty)
     {
         error_tok(tok, "expected a variable name");
     }
-    ty->name = tok;
-    *rest = tok->next;
+    Token *start = tok;
+    ty = type_suffix(&tok, tok->next, ty);
+    ty->name = start;
+    *rest = tok;
     return ty;
 }
 
@@ -458,7 +473,7 @@ Node *declaration(Token **rest, Token *tok)
 
 // stmt = "return" expr ";"
 //      | expr-stmt
-//      | "{" declaration | stmt* "}"
+//      | "{" compound-stmt
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "for" "(" expr-stmt expr? ";" expr? ")" stmt
 //      | "while" "(" expr ")" stmt
@@ -521,39 +536,60 @@ static Node *stmt(Token **rest, Token *tok)
 
     if (equal(tok, "{"))
     {
-        Node *node = new_node(ND_BLOCK, tok);
-        Node head = {};
-        Node *cur = &head;
-        tok = tok->next;
-        while (!equal(tok, "}"))
-        {
-            if (equal(tok, "int"))
-            {
-                cur = cur->next = declaration(&tok, tok);
-            }
-            else
-            {
-                cur = cur->next = stmt(&tok, tok);
-            }
-        }
-        tok = skip(tok, "}");
-        node->body = head.next;
+        Node *node = compound_stmt(&tok, tok->next);
         *rest = tok;
         return node;
     }
     return expr_stmt(rest, tok);
 }
 
-Function *parse(Token *tok)
+// compound_stmt = (declaration | stmt)* "}"
+Node *compound_stmt(Token **rest, Token *tok)
 {
+    Node *node = new_node(ND_BLOCK, tok);
     Node head = {};
     Node *cur = &head;
+    while (!equal(tok, "}"))
+    {
+        if (equal(tok, "int"))
+        {
+            cur = cur->next = declaration(&tok, tok);
+        }
+        else
+        {
+            cur = cur->next = stmt(&tok, tok);
+        }
+        add_type(cur);
+    }
+    tok = skip(tok, "}");
+    node->body = head.next;
+    *rest = tok;
+    return node;
+}
+
+Function *function(Token **rest, Token *tok)
+{
+    Type *ty = declspec(&tok, tok);
+    ty = declarator(&tok, tok, ty);
+    locals = NULL;
+
+    Function *fn = calloc(1, sizeof(Function));
+    fn->name = get_ident(ty->name);
+
+    tok = skip(tok, "{");
+    fn->body = compound_stmt(&tok, tok);
+    fn->locals = locals;
+    *rest = tok;
+    return fn;
+}
+
+Function *parse(Token *tok)
+{
+    Function head = {};
+    Function *cur = &head;
     while (tok->kind != TK_EOF)
     {
-        cur = cur->next = stmt(&tok, tok);
+        cur = cur->next = function(&tok, tok);
     }
-    Function *prog = calloc(1, sizeof(Function));
-    prog->body = head.next;
-    prog->locals = locals;
-    return prog;
+    return head.next;
 }

@@ -34,6 +34,10 @@ void add_type(Node *node)
     {
         add_type(n);
     }
+    for (Node *n = node->args; n; n = n->next)
+    {
+        add_type(n);
+    }
 
     switch (node->kind)
     {
@@ -53,6 +57,7 @@ void add_type(Node *node)
     case ND_LE:
     case ND_VAR:
     case ND_NUM:
+    case ND_FUNCCALL:
     {
         node->ty = ty_int;
         return;
@@ -73,4 +78,12 @@ void add_type(Node *node)
         }
         return;
     }
+}
+
+Type *func_type(Type *return_ty)
+{
+    Type *ty = calloc(1, sizeof(Type));
+    ty->kind = TY_FUNC;
+    ty->return_ty = return_ty;
+    return ty;
 }

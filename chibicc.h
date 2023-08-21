@@ -93,6 +93,8 @@ struct Node
 typedef struct Function Function;
 struct Function
 {
+    Function *next;
+    char *name;
     Node *body;
     Obj *locals;
     int stack_size;
@@ -102,12 +104,14 @@ typedef enum
 {
     TY_INT,
     TY_PTR,
+    TY_FUNC,
 } TypeKind;
 
 struct Type
 {
     TypeKind kind;
     Type *base;
+    Type *return_ty;
     // Declaration
     Token *name;
 };
@@ -115,6 +119,7 @@ struct Type
 bool is_integer(Type *ty);
 void add_type(Node *node);
 Type *pointer_to(Type *base);
+Type *func_type(Type *return_ty);
 extern Type *ty_int;
 
 void error(char *fmt, ...);
