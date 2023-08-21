@@ -79,7 +79,8 @@ Obj *new_lvar(char *name, Type *ty)
     return var;
 }
 
-// primary = "(" expr ")" | ident | num
+// primary = "(" expr ")" | ident args? | num
+// args = "(" ")"
 Node *primary(Token **rest, Token *tok)
 {
     if (equal(tok, "("))
@@ -98,6 +99,14 @@ Node *primary(Token **rest, Token *tok)
 
     if (tok->kind == TK_IDENT)
     {
+        if (equal(tok->next, "("))
+        {
+            Node *node = new_node(ND_FUNCCALL, tok);
+            node->funcname = strndup(tok->loc, tok->len);
+            tok = skip(tok->next->next, ")");
+            *rest = tok;
+            return node;
+        }
         Obj *var = find_var(tok);
         if (!var)
         {

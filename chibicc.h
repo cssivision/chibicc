@@ -32,20 +32,21 @@ struct Token
 
 typedef enum
 {
-    ND_ADD,    // +
-    ND_SUB,    // -
-    ND_MUL,    // *
-    ND_DIV,    // /
-    ND_NEG,    // unary -
-    ND_EQ,     // ==
-    ND_NE,     // !=
-    ND_LT,     // <
-    ND_LE,     // <=
-    ND_ASSIGN, // =
-    ND_ADDR,   // &
-    ND_DEREF,  // *
-    ND_NUM,    // Integer
-    ND_VAR,    // Variable
+    ND_ADD,      // +
+    ND_SUB,      // -
+    ND_MUL,      // *
+    ND_DIV,      // /
+    ND_NEG,      // unary -
+    ND_EQ,       // ==
+    ND_NE,       // !=
+    ND_LT,       // <
+    ND_LE,       // <=
+    ND_ASSIGN,   // =
+    ND_ADDR,     // &
+    ND_DEREF,    // *
+    ND_NUM,      // Integer
+    ND_VAR,      // Variable
+    ND_FUNCCALL, // Function call
 
     ND_RETURN,   // return
     ND_BLOCK,    // { .. }
@@ -73,6 +74,8 @@ struct Node
     Node *rhs;
 
     Node *body; // use if kind == ND_BLOCK
+
+    char *funcname;
 
     int val; // Used if kind == ND_NUM
 
