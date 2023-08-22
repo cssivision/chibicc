@@ -6,6 +6,8 @@ Obj *locals;
 
 Node *expr(Token **rest, Token *tok);
 Node *compound_stmt(Token **rest, Token *tok);
+Type *declarator(Token **rest, Token *tok, Type *ty);
+Type *declspec(Token **rest, Token *tok);
 
 bool equal(Token *tok, char *p)
 {
@@ -396,19 +398,38 @@ Type *declspec(Token **rest, Token *tok)
     return ty_int;
 }
 
-// type-suffix = ("(" func-params)?
+// type-suffix = ("(" func-params? ")")?
+// func-params = param ("," param)*
+// param = declspec declarator
 Type *type_suffix(Token **rest, Token *tok, Type *ty)
 {
-    if (equal(tok, "("))
+    if (!equal(tok, "("))
     {
-        *rest = skip(tok->next, ")");
-        return func_type(ty);
+        *rest = tok;
+        return ty;
     }
+    tok = tok->next;
+    Type head = {};
+    Type *cur = &head;
+    int i = 0;
+    while (!equal(tok, ")"))
+    {
+        if (i++ > 0)
+        {
+            tok = skip(tok, ",");
+        }
+        Type *basety = declspec(&tok, tok);
+        Type *ty = declarator(&tok, tok, basety);
+        cur = cur->next = copy_type(ty);
+    }
+    tok = skip(tok, ")");
+    ty = func_type(ty);
+    ty->params = head.next;
     *rest = tok;
     return ty;
 }
 
-// declarator "*"* ident type-suffix
+// declarator = "*"* ident type-suffix
 Type *declarator(Token **rest, Token *tok, Type *ty)
 {
     while (consume(&tok, tok, "*"))
@@ -567,6 +588,15 @@ Node *compound_stmt(Token **rest, Token *tok)
     return node;
 }
 
+void create_param_lvars(Type *param)
+{
+    if (param)
+    {
+        create_param_lvars(param->next);
+        new_lvar(get_ident(param->name), param);
+    }
+}
+
 Function *function(Token **rest, Token *tok)
 {
     Type *ty = declspec(&tok, tok);
@@ -575,6 +605,8 @@ Function *function(Token **rest, Token *tok)
 
     Function *fn = calloc(1, sizeof(Function));
     fn->name = get_ident(ty->name);
+    create_param_lvars(ty->params);
+    fn->params = locals;
 
     tok = skip(tok, "{");
     fn->body = compound_stmt(&tok, tok);

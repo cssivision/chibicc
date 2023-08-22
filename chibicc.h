@@ -96,6 +96,8 @@ struct Function
     Function *next;
     char *name;
     Node *body;
+    Obj *params;
+
     Obj *locals;
     int stack_size;
 };
@@ -110,16 +112,24 @@ typedef enum
 struct Type
 {
     TypeKind kind;
+
+    // Pointer
     Type *base;
-    Type *return_ty;
+
     // Declaration
     Token *name;
+
+    // Function
+    Type *return_ty;
+    Type *params;
+    Type *next;
 };
 
 bool is_integer(Type *ty);
 void add_type(Node *node);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_ty);
+Type *copy_type(Type *ty);
 extern Type *ty_int;
 
 void error(char *fmt, ...);

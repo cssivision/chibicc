@@ -2,6 +2,13 @@
 
 Type *ty_int = &(Type){TY_INT};
 
+Type *copy_type(Type *ty)
+{
+    Type *ret = calloc(1, sizeof(Type));
+    *ret = *ty;
+    return ret;
+}
+
 bool is_integer(Type *ty)
 {
     return ty->kind == TY_INT;
