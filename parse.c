@@ -234,7 +234,7 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok)
     }
 
     // ptr + num
-    rhs = new_binary(ND_MUL, rhs, new_num(8, tok), tok);
+    rhs = new_binary(ND_MUL, rhs, new_num(lhs->ty->base->size, tok), tok);
     return new_binary(ND_ADD, lhs, rhs, tok);
 }
 
@@ -253,7 +253,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok)
     // ptr - num
     if (lhs->ty->base && is_integer(rhs->ty))
     {
-        rhs = new_binary(ND_MUL, rhs, new_num(8, tok), tok);
+        rhs = new_binary(ND_MUL, rhs, new_num(lhs->ty->base->size, tok), tok);
         add_type(rhs);
         Node *node = new_binary(ND_SUB, lhs, rhs, tok);
         node->ty = lhs->ty;
@@ -265,7 +265,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok)
     {
         Node *node = new_binary(ND_SUB, lhs, rhs, tok);
         node->ty = ty_int;
-        return new_binary(ND_DIV, node, new_num(8, tok), tok);
+        return new_binary(ND_DIV, node, new_num(lhs->ty->base->size, tok), tok);
     }
 
     error_tok(tok, "invalid operands");
@@ -398,17 +398,10 @@ Type *declspec(Token **rest, Token *tok)
     return ty_int;
 }
 
-// type-suffix = ("(" func-params? ")")?
 // func-params = param ("," param)*
 // param = declspec declarator
-Type *type_suffix(Token **rest, Token *tok, Type *ty)
+Type *func_params(Token **rest, Token *tok)
 {
-    if (!equal(tok, "("))
-    {
-        *rest = tok;
-        return ty;
-    }
-    tok = tok->next;
     Type head = {};
     Type *cur = &head;
     int i = 0;
@@ -422,9 +415,40 @@ Type *type_suffix(Token **rest, Token *tok, Type *ty)
         Type *ty = declarator(&tok, tok, basety);
         cur = cur->next = copy_type(ty);
     }
-    tok = skip(tok, ")");
-    ty = func_type(ty);
+    Type *ty = func_type(ty);
     ty->params = head.next;
+    *rest = tok;
+    return ty;
+}
+
+int get_num(Token *tok)
+{
+    if (tok->kind != TK_NUM)
+    {
+        error_tok(tok, "expected a number");
+    }
+    return tok->val;
+}
+
+// type-suffix = ("(" func-params? ")")?
+//               | "[" num "]"
+Type *type_suffix(Token **rest, Token *tok, Type *ty)
+{
+    if (equal(tok, "("))
+    {
+        Type *ty = func_params(&tok, tok->next);
+        tok = skip(tok, ")");
+        *rest = tok;
+        return ty;
+    }
+    if (equal(tok, "["))
+    {
+        tok = tok->next;
+        int len = get_num(tok);
+        tok = skip(tok->next, "]");
+        *rest = tok;
+        return array_of(ty, len);
+    }
     *rest = tok;
     return ty;
 }
@@ -597,6 +621,7 @@ void create_param_lvars(Type *param)
     }
 }
 
+// function = declspec declarator "{" compound_stmt
 Function *function(Token **rest, Token *tok)
 {
     Type *ty = declspec(&tok, tok);
@@ -615,6 +640,7 @@ Function *function(Token **rest, Token *tok)
     return fn;
 }
 
+// program = function*
 Function *parse(Token *tok)
 {
     Function head = {};
