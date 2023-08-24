@@ -431,7 +431,7 @@ int get_num(Token *tok)
 }
 
 // type-suffix = ("(" func-params? ")")?
-//               | "[" num "]"
+//               | "[" num "]" type-suffix
 Type *type_suffix(Token **rest, Token *tok, Type *ty)
 {
     if (equal(tok, "("))
@@ -446,6 +446,7 @@ Type *type_suffix(Token **rest, Token *tok, Type *ty)
         tok = tok->next;
         int len = get_num(tok);
         tok = skip(tok->next, "]");
+        ty = type_suffix(&tok, tok, ty);
         *rest = tok;
         return array_of(ty, len);
     }
