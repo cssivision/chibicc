@@ -4,6 +4,7 @@
 // accumulated to this list.
 Obj *locals;
 
+Node *new_add(Node *lhs, Node *rhs, Token *tok);
 Node *expr(Token **rest, Token *tok);
 Node *compound_stmt(Token **rest, Token *tok);
 Type *declarator(Token **rest, Token *tok, Type *ty);
@@ -144,8 +145,25 @@ Node *primary(Token **rest, Token *tok)
     error_tok(tok, "expected an expression");
 }
 
+// postfix = primary ("[" expr "]")*
+static Node *postfix(Token **rest, Token *tok)
+{
+    Node *node = primary(&tok, tok);
+
+    while (equal(tok, "["))
+    {
+        // x[y] is short for *(x+y)
+        Token *start = tok;
+        Node *idx = expr(&tok, tok->next);
+        tok = skip(tok, "]");
+        node = new_unary(ND_DEREF, new_add(node, idx, start), start);
+    }
+    *rest = tok;
+    return node;
+}
+
 // unary = ("+" | "-" | "&" | "*") unary
-//       | primary
+//       | postfix
 Node *unary(Token **rest, Token *tok)
 {
     if (equal(tok, "+"))
@@ -176,7 +194,7 @@ Node *unary(Token **rest, Token *tok)
         return node;
     }
 
-    return primary(rest, tok);
+    return postfix(rest, tok);
 }
 
 // mul = unary ("*" unary | "/" unary)*
@@ -209,7 +227,7 @@ Node *mul(Token **rest, Token *tok)
 // so that p+n points to the location n elements (not bytes) ahead of p.
 // In other words, we need to scale an integer value before adding to a
 // pointer value. This function takes care of the scaling.
-static Node *new_add(Node *lhs, Node *rhs, Token *tok)
+Node *new_add(Node *lhs, Node *rhs, Token *tok)
 {
     add_type(lhs);
     add_type(rhs);
