@@ -6,6 +6,7 @@ Obj *locals;
 
 Node *new_add(Node *lhs, Node *rhs, Token *tok);
 Node *expr(Token **rest, Token *tok);
+Node *unary(Token **rest, Token *tok);
 Node *compound_stmt(Token **rest, Token *tok);
 Type *declarator(Token **rest, Token *tok, Type *ty);
 Type *declspec(Token **rest, Token *tok);
@@ -109,7 +110,7 @@ Node *funccall(Token **rest, Token *tok)
     return node;
 }
 
-// primary = "(" expr ")" | ident func-args? | num
+// primary = "(" expr ")" | ident func-args? | num | sizeof unary
 Node *primary(Token **rest, Token *tok)
 {
     if (equal(tok, "("))
@@ -117,6 +118,14 @@ Node *primary(Token **rest, Token *tok)
         Node *node = expr(&tok, tok->next);
         *rest = skip(tok, ")");
         return node;
+    }
+
+    if (equal(tok, "sizeof"))
+    {
+        Node *node = unary(&tok, tok->next);
+        add_type(node);
+        *rest = tok;
+        return new_num(node->ty->size, tok);
     }
 
     if (tok->kind == TK_NUM)
