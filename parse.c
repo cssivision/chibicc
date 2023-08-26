@@ -72,6 +72,14 @@ Obj *find_var(Token *tok)
             return var;
         }
     }
+
+    for (Obj *var = globals; var; var = var->next)
+    {
+        if (strlen(var->name) == tok->len && !strncmp(tok->loc, var->name, tok->len))
+        {
+            return var;
+        }
+    }
     return NULL;
 }
 
@@ -683,6 +691,34 @@ Token *function(Token *tok, Type *basety)
     return tok;
 }
 
+bool is_function(Token *tok)
+{
+    if (equal(tok, ";"))
+    {
+        return false;
+    }
+
+    Type dummy = {};
+    Type *ty = declarator(&tok, tok, &dummy);
+    return ty->kind == TY_FUNC;
+}
+
+Token *global_variable(Token *tok, Type *basety)
+{
+    int i = 0;
+    while (!equal(tok, ";"))
+    {
+        if (i++ > 0)
+        {
+            tok = skip(tok, ",");
+        }
+        Type *ty = declarator(&tok, tok, basety);
+        new_gvar(get_ident(ty->name), ty);
+    }
+    tok = skip(tok, ";");
+    return tok;
+}
+
 // program = (function-definition | global-variable)*
 Obj *parse(Token *tok)
 {
@@ -690,7 +726,12 @@ Obj *parse(Token *tok)
     while (tok->kind != TK_EOF)
     {
         Type *basety = declspec(&tok, tok);
-        tok = function(tok, basety);
+        if (is_function(tok))
+        {
+            tok = function(tok, basety);
+            continue;
+        }
+        tok = global_variable(tok, basety);
     }
     return globals;
 }
