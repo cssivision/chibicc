@@ -55,13 +55,23 @@ typedef enum
     ND_EXPR_STMT // Expression statement
 } NodeKind;
 
-// Local variable
+// Variable or function
 struct Obj
 {
     Obj *next;
     char *name; // Variable name
     Type *ty;
-    int offset; // Offset from RBP
+    int offset;    // Offset from RBP
+    bool is_local; // local or global/function
+    Node *body;
+    // Function params
+    Obj *params;
+
+    // Global variable or function
+    bool is_function;
+
+    Obj *locals;
+    int stack_size;
 };
 
 struct Node
@@ -88,18 +98,6 @@ struct Node
     Node *els;
     Node *init;
     Node *inc;
-};
-
-typedef struct Function Function;
-struct Function
-{
-    Function *next;
-    char *name;
-    Node *body;
-    Obj *params;
-
-    Obj *locals;
-    int stack_size;
 };
 
 typedef enum
@@ -146,5 +144,5 @@ bool equal(Token *tok, char *p);
 bool consume(Token **rest, Token *tok, char *str);
 
 Token *tokenize(char *p);
-Function *parse(Token *tok);
-void codegen(Function *prog);
+Obj *parse(Token *tok);
+void codegen(Obj *prog);
