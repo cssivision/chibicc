@@ -28,6 +28,8 @@ struct Token
     int val;
     char *loc;
     int len;
+    Type *ty;
+    char *str;
 };
 
 typedef enum
@@ -47,6 +49,7 @@ typedef enum
     ND_NUM,      // Integer
     ND_VAR,      // Variable
     ND_FUNCCALL, // Function call
+    TK_STR,
 
     ND_RETURN,   // return
     ND_BLOCK,    // { .. }
@@ -69,6 +72,9 @@ struct Obj
 
     // Global variable or function
     bool is_function;
+
+    // Global variable
+    char *init_data;
 
     Obj *locals;
     int stack_size;

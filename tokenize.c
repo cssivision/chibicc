@@ -96,6 +96,20 @@ void convert_keywords(Token *tok)
     }
 }
 
+Token *read_string_literal(char *start)
+{
+    char *p = start + 1;
+    for (; *p != '"'; p++)
+    {
+        if (*p == '\n' || *p == '\0')
+            error_at(start, "unclosed string literal");
+    }
+    Token *tok = new_token(TK_STR, start, p + 1);
+    tok->ty = array_of(ty_char, p - start);
+    tok->str = strndup(start + 1, p - start - 1);
+    return tok;
+}
+
 Token *tokenize(char *p)
 {
     current_input = p;
@@ -109,6 +123,12 @@ Token *tokenize(char *p)
         {
             p++;
             continue;
+        }
+
+        if (*p == '"')
+        {
+            cur = cur->next = read_string_literal(p);
+            p = p + cur->len;
         }
 
         if (isdigit(*p))

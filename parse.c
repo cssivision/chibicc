@@ -134,7 +134,27 @@ Node *funccall(Token **rest, Token *tok)
     return node;
 }
 
-// primary = "(" expr ")" | ident func-args? | num | sizeof unary
+char *new_unique_name()
+{
+    static int id = 0;
+    char *buf = calloc(1, 20);
+    sprintf(buf, ".L..%d", id++);
+    return buf;
+}
+
+Obj *new_anon_gvar(Type *ty)
+{
+    return new_gvar(new_unique_name(), ty);
+}
+
+Obj *new_string_literal(char *str, Type *ty)
+{
+    Obj *var = new_anon_gvar(ty);
+    var->init_data = str;
+    return var;
+}
+
+// primary = "(" expr ")" | ident func-args? | num | sizeof unary | str
 Node *primary(Token **rest, Token *tok)
 {
     if (equal(tok, "("))
@@ -150,6 +170,13 @@ Node *primary(Token **rest, Token *tok)
         add_type(node);
         *rest = tok;
         return new_num(node->ty->size, tok);
+    }
+
+    if (tok->kind == TK_STR)
+    {
+        Obj *var = new_string_literal(tok->str, tok->ty);
+        *rest = tok->next;
+        return new_var_node(var, tok);
     }
 
     if (tok->kind == TK_NUM)
