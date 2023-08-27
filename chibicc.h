@@ -105,7 +105,8 @@ typedef enum
     TY_INT,
     TY_PTR,
     TY_FUNC,
-    TY_ARRAY
+    TY_ARRAY,
+    TY_CHAR
 } TypeKind;
 
 struct Type
@@ -136,6 +137,7 @@ Type *func_type(Type *return_ty);
 Type *copy_type(Type *ty);
 Type *array_of(Type *base, int len);
 extern Type *ty_int;
+extern Type *ty_char;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);

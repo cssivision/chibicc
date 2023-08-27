@@ -441,9 +441,15 @@ static Node *expr_stmt(Token **rest, Token *tok)
     return node;
 }
 
-// declspec = "int"
+// declspec = "int" | "char"
 Type *declspec(Token **rest, Token *tok)
 {
+    if (equal(tok, "char"))
+    {
+        tok = skip(tok, "char");
+        *rest = tok;
+        return ty_char;
+    }
     tok = skip(tok, "int");
     *rest = tok;
     return ty_int;
@@ -640,6 +646,11 @@ static Node *stmt(Token **rest, Token *tok)
     return expr_stmt(rest, tok);
 }
 
+bool is_typename(Token *tok)
+{
+    return equal(tok, "int") || equal(tok, "char");
+}
+
 // compound_stmt = (declaration | stmt)* "}"
 Node *compound_stmt(Token **rest, Token *tok)
 {
@@ -648,7 +659,7 @@ Node *compound_stmt(Token **rest, Token *tok)
     Node *cur = &head;
     while (!equal(tok, "}"))
     {
-        if (equal(tok, "int"))
+        if (is_typename(tok))
         {
             cur = cur->next = declaration(&tok, tok);
         }
