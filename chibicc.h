@@ -157,4 +157,4 @@ char *format(char *fmt, ...);
 
 Token *tokenize_file(char *path);
 Obj *parse(Token *tok);
-void codegen(Obj *prog);
+void codegen(Obj *prog, FILE *out);
