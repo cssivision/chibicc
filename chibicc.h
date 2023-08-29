@@ -151,6 +151,8 @@ void error_tok(Token *tok, char *fmt, ...);
 bool equal(Token *tok, char *p);
 bool consume(Token **rest, Token *tok, char *str);
 
+char *format(char *fmt, ...);
+
 Token *tokenize(char *p);
 Obj *parse(Token *tok);
 void codegen(Obj *prog);
