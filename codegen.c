@@ -2,6 +2,7 @@
 
 void gen_addr(Node *node);
 void gen_expr(Node *node);
+void gen_stmt(Node *node);
 
 static int depth;
 static char *argreg8[] = {"%dil", "%sil", "%dl", "%cl", "%r8b", "%r9b"};
@@ -112,6 +113,12 @@ void gen_expr(Node *node)
         gen_expr(node->rhs);
         store(node->ty);
         return;
+    case ND_STMT_EXPR:
+        for (Node *n = node->body; n; n = n->next)
+        {
+            gen_stmt(n);
+        }
+        return;
     case ND_FUNCCALL:
     {
         int nargs = 0;
@@ -181,7 +188,7 @@ static int count(void)
     return i++;
 }
 
-static void gen_stmt(Node *node)
+void gen_stmt(Node *node)
 {
     switch (node->kind)
     {

@@ -51,11 +51,12 @@ typedef enum
     ND_FUNCCALL, // Function call
     TK_STR,
 
-    ND_RETURN,   // return
-    ND_BLOCK,    // { .. }
-    ND_IF,       // if
-    ND_FOR,      // for or while
-    ND_EXPR_STMT // Expression statement
+    ND_RETURN,    // return
+    ND_BLOCK,     // { .. }
+    ND_IF,        // if
+    ND_FOR,       // for or while
+    ND_EXPR_STMT, // Expression statement
+    ND_STMT_EXPR
 } NodeKind;
 
 // Variable or function

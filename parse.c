@@ -152,9 +152,25 @@ Obj *new_string_literal(char *str, Type *ty)
     return var;
 }
 
-// primary = "(" expr ")" | ident func-args? | num | sizeof unary | str
+// primary = "(" expr ")"
+//          | ("{" stmt+ "}")
+//          | ident func-args?
+//          | num
+//          | sizeof unary
+//          | str
 Node *primary(Token **rest, Token *tok)
 {
+    if (equal(tok, "(") && equal(tok->next, "{"))
+    {
+        // This is a GNU statement expresssion.
+        tok = tok->next->next;
+        Node *node = new_node(ND_STMT_EXPR, tok);
+        node->body = compound_stmt(&tok, tok)->body;
+        tok = skip(tok, ")");
+        *rest = tok;
+        return node;
+    }
+
     if (equal(tok, "("))
     {
         Node *node = expr(&tok, tok->next);
