@@ -4,6 +4,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include "ctype.h"
+#include "errno.h"
 #include "stdbool.h"
 #include "assert.h"
 
@@ -154,6 +155,6 @@ bool consume(Token **rest, Token *tok, char *str);
 
 char *format(char *fmt, ...);
 
-Token *tokenize(char *p);
+Token *tokenize_file(char *path);
 Obj *parse(Token *tok);
 void codegen(Obj *prog);
