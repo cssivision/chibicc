@@ -257,6 +257,27 @@ Token *tokenize(char *path, char *p)
 
     while (*p)
     {
+        // Skip line comments.
+        if (startswith(p, "//"))
+        {
+            p += 2;
+            while (*p != '\n')
+                p++;
+            continue;
+        }
+
+        // Skip block comments.
+        if (startswith(p, "/*"))
+        {
+            char *q = strstr(p + 2, "*/");
+            if (!q)
+            {
+                error_at(p, "unclosed block comment");
+            }
+            p = q + 2;
+            continue;
+        }
+
         if (isspace(*p))
         {
             p++;
