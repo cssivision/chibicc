@@ -2,3 +2,5 @@
 *.o
 tmp*
 chibicc
+test/*.s
+test/*.exe
