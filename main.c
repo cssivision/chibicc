@@ -68,6 +68,7 @@ int main(int argc, char **argv)
     Token *tok = tokenize_file(input_path);
     Obj *prog = parse(tok);
     FILE *out = open_file(opt_o);
+    fprintf(out, ".file 1 \"%s\"\n", input_path);
     codegen(prog, out);
     return 0;
 }

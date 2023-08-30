@@ -97,6 +97,8 @@ void gen_addr(Node *node)
 
 void gen_expr(Node *node)
 {
+    println("  .loc 1 %d", node->tok->line_no);
+
     switch (node->kind)
     {
     case ND_NUM:
@@ -200,6 +202,8 @@ static int count(void)
 
 void gen_stmt(Node *node)
 {
+    println("  .loc 1 %d", node->tok->line_no);
+
     switch (node->kind)
     {
     case ND_FOR:
