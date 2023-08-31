@@ -88,6 +88,9 @@ void add_type(Node *node)
         node->ty = ty_int;
         return;
     }
+    case ND_MEMBER:
+        node->ty = node->member->ty;
+        return;
     case ND_VAR:
         node->ty = node->var->ty;
         return;

@@ -12,6 +12,7 @@ typedef struct Type Type;
 typedef struct Token Token;
 typedef struct Obj Obj;
 typedef struct Node Node;
+typedef struct Member Member;
 
 typedef enum
 {
@@ -35,6 +36,14 @@ struct Token
     int line_no; // Line number
 };
 
+struct Member
+{
+    Member *next;
+    Type *ty;
+    Token *name;
+    int offset;
+};
+
 typedef enum
 {
     ND_ADD,      // +
@@ -54,6 +63,7 @@ typedef enum
     ND_FUNCCALL, // Function call
     TK_STR,      // "str"
     ND_COMMA,    // ,
+    ND_MEMBER,   // .
 
     ND_RETURN,    // return
     ND_BLOCK,     // { .. }
@@ -103,6 +113,8 @@ struct Node
 
     Obj *var; // Used if kind == ND_VAR
 
+    Member *member;
+
     // "if" or "for" statement
     Node *cond;
     Node *then;
@@ -117,7 +129,8 @@ typedef enum
     TY_PTR,
     TY_FUNC,
     TY_ARRAY,
-    TY_CHAR
+    TY_CHAR,
+    TY_STRUCT
 } TypeKind;
 
 struct Type
@@ -139,6 +152,8 @@ struct Type
     Type *return_ty;
     Type *params;
     Type *next;
+
+    Member *members;
 };
 
 bool is_integer(Type *ty);

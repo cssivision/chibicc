@@ -254,21 +254,62 @@ Node *primary(Token **rest, Token *tok)
     error_tok(tok, "expected an expression");
 }
 
-// postfix = primary ("[" expr "]")*
+Member *get_struct_member(Type *ty, Token *tok)
+{
+    for (Member *mem = ty->members; mem; mem = mem->next)
+    {
+        if (mem->name->len == tok->len &&
+            !strncmp(mem->name->loc, tok->loc, tok->len))
+        {
+            return mem;
+        }
+    }
+    error_tok(tok, "no such member");
+}
+
+Node *struct_ref(Token *tok, Node *lhs)
+{
+    if (tok->kind != TK_IDENT)
+    {
+        error_tok(tok, "expecetd an ident");
+    }
+    add_type(lhs);
+    if (lhs->ty->kind != TY_STRUCT)
+    {
+        error_tok(lhs->tok, "not a struct");
+    }
+    Node *node = new_unary(ND_MEMBER, lhs, tok);
+    node->member = get_struct_member(lhs->ty, tok);
+    return node;
+}
+
+// postfix = primary ("[" expr "]" | "." ident )*
 static Node *postfix(Token **rest, Token *tok)
 {
     Node *node = primary(&tok, tok);
 
-    while (equal(tok, "["))
+    for (;;)
     {
-        // x[y] is short for *(x+y)
-        Token *start = tok;
-        Node *idx = expr(&tok, tok->next);
-        tok = skip(tok, "]");
-        node = new_unary(ND_DEREF, new_add(node, idx, start), start);
+        if (equal(tok, "["))
+        {
+            // x[y] is short for *(x+y)
+            Token *start = tok;
+            Node *idx = expr(&tok, tok->next);
+            tok = skip(tok, "]");
+            node = new_unary(ND_DEREF, new_add(node, idx, start), start);
+            continue;
+        }
+
+        if (equal(tok, "."))
+        {
+            tok = tok->next;
+            node = struct_ref(tok, node);
+            tok = tok->next;
+            continue;
+        }
+        *rest = tok;
+        return node;
     }
-    *rest = tok;
-    return node;
 }
 
 // unary = ("+" | "-" | "&" | "*") unary
@@ -525,7 +566,58 @@ static Node *expr_stmt(Token **rest, Token *tok)
     return node;
 }
 
-// declspec = "int" | "char"
+// struct-members = (declspec declarator ("," declarator)* ";")*
+void struct_members(Token **rest, Token *tok, Type *ty)
+{
+    Member head = {};
+    Member *cur = &head;
+    while (!equal(tok, "}"))
+    {
+        int i = 0;
+        Type *basety = declspec(&tok, tok);
+        while (!equal(tok, ";"))
+        {
+            if (i++ > 0)
+            {
+                tok = skip(tok, ",");
+            }
+            Type *ty = declarator(&tok, tok, basety);
+            Member *mem = calloc(1, sizeof(Member));
+            mem->ty = ty;
+            mem->name = ty->name;
+            cur = cur->next = mem;
+        }
+        tok = skip(tok, ";");
+    }
+    tok = skip(tok, "}");
+    *rest = tok;
+    ty->members = head.next;
+}
+
+// struct-decl = "{" struct-members
+Type *struct_decl(Token **rest, Token *tok)
+{
+    tok = skip(tok, "{");
+
+    Type *ty = calloc(1, sizeof(Type));
+    ty->kind = TY_STRUCT;
+    struct_members(&tok, tok, ty);
+
+    // Assign offsets within the struct to members.
+    int offset = 0;
+    for (Member *mem = ty->members; mem; mem = mem->next)
+    {
+        mem->offset = offset;
+        offset += mem->ty->size;
+        printf("%d\n", mem->offset);
+    }
+    ty->size = offset;
+
+    *rest = tok;
+    return ty;
+}
+
+// declspec = "int" | "char" | struct-decl
 Type *declspec(Token **rest, Token *tok)
 {
     if (equal(tok, "char"))
@@ -534,9 +626,23 @@ Type *declspec(Token **rest, Token *tok)
         *rest = tok;
         return ty_char;
     }
-    tok = skip(tok, "int");
-    *rest = tok;
-    return ty_int;
+
+    if (equal(tok, "int"))
+    {
+        tok = skip(tok, "int");
+        *rest = tok;
+        return ty_int;
+    }
+
+    if (equal(tok, "struct"))
+    {
+        tok = skip(tok, "struct");
+        Type *ty = struct_decl(&tok, tok);
+        *rest = tok;
+        return ty;
+    }
+
+    error_tok(tok, "typename expected");
 }
 
 // func-params = param ("," param)*
@@ -732,7 +838,7 @@ static Node *stmt(Token **rest, Token *tok)
 
 bool is_typename(Token *tok)
 {
-    return equal(tok, "int") || equal(tok, "char");
+    return equal(tok, "int") || equal(tok, "char") || equal(tok, "struct");
 }
 
 // compound_stmt = (declaration | stmt)* "}"
