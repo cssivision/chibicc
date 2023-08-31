@@ -103,6 +103,11 @@ void add_type(Node *node)
         }
         return;
     }
+    case ND_COMMA:
+    {
+        node->ty = node->rhs->ty;
+        return;
+    }
     case ND_DEREF:
         if (!node->lhs->ty->base)
         {

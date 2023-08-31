@@ -4,6 +4,7 @@ Node *new_add(Node *lhs, Node *rhs, Token *tok);
 Node *expr(Token **rest, Token *tok);
 Node *unary(Token **rest, Token *tok);
 Node *compound_stmt(Token **rest, Token *tok);
+Node *assign(Token **rest, Token *tok);
 Type *declarator(Token **rest, Token *tok, Type *ty);
 Type *declspec(Token **rest, Token *tok);
 
@@ -142,7 +143,7 @@ Obj *new_gvar(char *name, Type *ty)
     return var;
 }
 
-// funcall = ident "(" (expr ("," expr)*)? ")"
+// funcall = ident "(" (assign ("," assign)*)? ")"
 Node *funccall(Token **rest, Token *tok)
 {
     Node *node = new_node(ND_FUNCCALL, tok);
@@ -160,7 +161,7 @@ Node *funccall(Token **rest, Token *tok)
         {
             tok = skip(tok, ",");
         }
-        cur = cur->next = expr(&tok, tok);
+        cur = cur->next = assign(&tok, tok);
     }
     tok = skip(tok, ")");
     node->args = head.next;
@@ -496,10 +497,18 @@ Node *assign(Token **rest, Token *tok)
     return node;
 }
 
-// expr = assign
+// expr = assign ("," expr)?
 Node *expr(Token **rest, Token *tok)
 {
-    return assign(rest, tok);
+    Node *node = assign(&tok, tok);
+    if (equal(tok, ","))
+    {
+        node = new_binary(ND_COMMA, node, expr(&tok, tok->next), tok);
+        *rest = tok;
+        return node;
+    }
+    *rest = tok;
+    return node;
 }
 
 // expr-stmt = expr? ";"
@@ -614,7 +623,7 @@ static char *get_ident(Token *tok)
     return strndup(tok->loc, tok->len);
 }
 
-// declaration = declspec (declarator ("=" expr)? (",", declarator ("=" expr)?)*)? ";"
+// declaration = declspec (declarator ("=" assign)? (",", declarator ("=" assign)?)*)? ";"
 Node *declaration(Token **rest, Token *tok)
 {
     Type *basety = declspec(&tok, tok);
@@ -639,7 +648,7 @@ Node *declaration(Token **rest, Token *tok)
         }
 
         Node *lhs = new_var_node(var, ty->name);
-        Node *rhs = expr(&tok, tok->next);
+        Node *rhs = assign(&tok, tok->next);
         Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
         cur = cur->next = new_unary(ND_EXPR_STMT, node, tok);
     }

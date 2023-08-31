@@ -52,7 +52,8 @@ typedef enum
     ND_NUM,      // Integer
     ND_VAR,      // Variable
     ND_FUNCCALL, // Function call
-    TK_STR,
+    TK_STR,      // "str"
+    ND_COMMA,    // ,
 
     ND_RETURN,    // return
     ND_BLOCK,     // { .. }
