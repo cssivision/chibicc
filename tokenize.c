@@ -81,10 +81,13 @@ bool startswith(char *p, char *q)
 
 int read_punct(char *p)
 {
-    if (startswith(p, "==") || startswith(p, "!=") ||
-        startswith(p, ">=") || startswith(p, "<="))
+    static char *kw[] = {"==", "!=", "<=", ">=", "->"};
+    for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
-        return 2;
+        if (startswith(p, kw[i]))
+        {
+            return strlen(kw[i]);
+        }
     }
     return ispunct(*p) ? 1 : 0;
 }

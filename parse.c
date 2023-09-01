@@ -316,7 +316,7 @@ Node *struct_ref(Token *tok, Node *lhs)
     return node;
 }
 
-// postfix = primary ("[" expr "]" | "." ident )*
+// postfix = primary ("[" expr "]" | "." ident  | "->" ident )*
 static Node *postfix(Token **rest, Token *tok)
 {
     Node *node = primary(&tok, tok);
@@ -335,6 +335,15 @@ static Node *postfix(Token **rest, Token *tok)
 
         if (equal(tok, "."))
         {
+            tok = tok->next;
+            node = struct_ref(tok, node);
+            tok = tok->next;
+            continue;
+        }
+        if (equal(tok, "->"))
+        {
+            // x->y is short for (*x).y
+            node = new_unary(ND_DEREF, node, tok);
             tok = tok->next;
             node = struct_ref(tok, node);
             tok = tok->next;
