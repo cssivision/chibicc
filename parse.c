@@ -307,7 +307,7 @@ Node *struct_ref(Token *tok, Node *lhs)
         error_tok(tok, "expecetd an ident");
     }
     add_type(lhs);
-    if (lhs->ty->kind != TY_STRUCT)
+    if (lhs->ty->kind != TY_STRUCT && lhs->ty->kind != TY_UNION)
     {
         error_tok(lhs->tok, "not a struct");
     }
@@ -636,8 +636,8 @@ void struct_members(Token **rest, Token *tok, Type *ty)
     ty->members = head.next;
 }
 
-// struct-decl = ident? "{" struct-members
-Type *struct_decl(Token **rest, Token *tok)
+// struct-union-decl = ident? ("{" struct-members )?
+Type *struct_union_decl(Token **rest, Token *tok)
 {
     Token *tag = NULL;
     if (tok->kind == TK_IDENT)
@@ -663,6 +663,19 @@ Type *struct_decl(Token **rest, Token *tok)
     struct_members(&tok, tok, ty);
     ty->align = 1;
 
+    if (tag)
+    {
+        push_tag_scope(tag, ty);
+    }
+    *rest = tok;
+    return ty;
+}
+
+static Type *struct_decl(Token **rest, Token *tok)
+{
+    Type *ty = struct_union_decl(&tok, tok);
+    ty->kind = TY_STRUCT;
+
     // Assign offsets within the struct to members.
     int offset = 0;
     for (Member *mem = ty->members; mem; mem = mem->next)
@@ -676,11 +689,30 @@ Type *struct_decl(Token **rest, Token *tok)
         }
     }
     ty->size = align_to(offset, ty->align);
+    *rest = tok;
+    return ty;
+}
 
-    if (tag)
+static Type *union_decl(Token **rest, Token *tok)
+{
+    Type *ty = struct_union_decl(&tok, tok);
+    ty->kind = TY_UNION;
+
+    // If union, we don't have to assign offsets because they
+    // are already initialized to zero. We need to compute the
+    // alignment and the size though.
+    for (Member *mem = ty->members; mem; mem = mem->next)
     {
-        push_tag_scope(tag, ty);
+        if (ty->align < mem->ty->align)
+        {
+            ty->align = mem->ty->align;
+        }
+        if (ty->size < mem->ty->size)
+        {
+            ty->size = mem->ty->size;
+        }
     }
+    ty->size = align_to(ty->size, ty->align);
     *rest = tok;
     return ty;
 }
@@ -706,6 +738,14 @@ Type *declspec(Token **rest, Token *tok)
     {
         tok = skip(tok, "struct");
         Type *ty = struct_decl(&tok, tok);
+        *rest = tok;
+        return ty;
+    }
+
+    if (equal(tok, "union"))
+    {
+        tok = skip(tok, "union");
+        Type *ty = union_decl(&tok, tok);
         *rest = tok;
         return ty;
     }
@@ -906,7 +946,7 @@ static Node *stmt(Token **rest, Token *tok)
 
 bool is_typename(Token *tok)
 {
-    return equal(tok, "int") || equal(tok, "char") || equal(tok, "struct");
+    return equal(tok, "int") || equal(tok, "char") || equal(tok, "struct") || equal(tok, "union");
 }
 
 // compound_stmt = (declaration | stmt)* "}"
