@@ -16,11 +16,20 @@ struct VarScope
     Obj *var;
 };
 
+typedef struct TagScope TagScope;
+struct TagScope
+{
+    TagScope *next;
+    char *name;
+    Type *ty;
+};
+
 typedef struct Scope Scope;
 struct Scope
 {
     Scope *next;
     VarScope *vars;
+    TagScope *tags;
 };
 
 // All local variable instances created during parsing are
@@ -48,6 +57,30 @@ static void push_scope(char *name, Obj *var)
     vs->var = var;
     vs->next = scope->vars;
     scope->vars = vs;
+}
+
+static void push_tag_scope(Token *tok, Type *ty)
+{
+    TagScope *ts = calloc(1, sizeof(TagScope));
+    ts->name = strndup(tok->loc, tok->len);
+    ts->ty = ty;
+    ts->next = scope->tags;
+    scope->tags = ts;
+}
+
+Type *find_tag(Token *tag)
+{
+    for (Scope *sc = scope; sc; sc = sc->next)
+    {
+        for (TagScope *ts = sc->tags; ts; ts = ts->next)
+        {
+            if (strncmp(tag->loc, ts->name, tag->len) == 0)
+            {
+                return ts->ty;
+            }
+        }
+    }
+    return NULL;
 }
 
 bool equal(Token *tok, char *p)
@@ -594,9 +627,26 @@ void struct_members(Token **rest, Token *tok, Type *ty)
     ty->members = head.next;
 }
 
-// struct-decl = "{" struct-members
+// struct-decl = ident? "{" struct-members
 Type *struct_decl(Token **rest, Token *tok)
 {
+    Token *tag = NULL;
+    if (tok->kind == TK_IDENT)
+    {
+        tag = tok;
+        tok = tok->next;
+    }
+    if (tag && !equal(tok, "{"))
+    {
+        Type *ty = find_tag(tag);
+        if (!ty)
+        {
+            error_tok(tag, "unknow struct type");
+        }
+        *rest = tok;
+        return ty;
+    }
+
     tok = skip(tok, "{");
 
     Type *ty = calloc(1, sizeof(Type));
@@ -618,6 +668,10 @@ Type *struct_decl(Token **rest, Token *tok)
     }
     ty->size = align_to(offset, ty->align);
 
+    if (tag)
+    {
+        push_tag_scope(tag, ty);
+    }
     *rest = tok;
     return ty;
 }
