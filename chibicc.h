@@ -138,6 +138,7 @@ struct Type
     TypeKind kind;
 
     int size; // sizeof() value
+    int align;
 
     // Pointer
     Type *base;
@@ -176,3 +177,4 @@ char *format(char *fmt, ...);
 Token *tokenize_file(char *path);
 Obj *parse(Token *tok);
 void codegen(Obj *prog, FILE *out);
+int align_to(int n, int align);
