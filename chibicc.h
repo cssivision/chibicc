@@ -88,6 +88,7 @@ struct Obj
 
     // Global variable or function
     bool is_function;
+    bool is_definition;
 
     // Global variable
     char *init_data;
@@ -131,6 +132,7 @@ typedef enum
     TY_FUNC,
     TY_ARRAY,
     TY_CHAR,
+    TY_VOID,
     TY_STRUCT,
     TY_UNION,
     TY_LONG,
@@ -171,6 +173,7 @@ extern Type *ty_int;
 extern Type *ty_char;
 extern Type *ty_long;
 extern Type *ty_short;
+extern Type *ty_void;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);

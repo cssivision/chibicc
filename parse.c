@@ -717,9 +717,15 @@ static Type *union_decl(Token **rest, Token *tok)
     return ty;
 }
 
-// declspec = "int" | "char" | "long" | struct-decl | union_decl
+// declspec = "void" | "int" | "char" | "long" | struct-decl | union_decl
 Type *declspec(Token **rest, Token *tok)
 {
+    if (equal(tok, "void"))
+    {
+        *rest = tok->next;
+        return ty_void;
+    }
+
     if (equal(tok, "char"))
     {
         *rest = tok->next;
@@ -874,6 +880,10 @@ Node *declaration(Token **rest, Token *tok)
         }
 
         Type *ty = declarator(&tok, tok, basety);
+        if (ty->kind == TY_VOID)
+        {
+            error_tok(tok, "variable declared void");
+        }
         Obj *var = new_lvar(get_ident(ty->name), ty);
 
         if (!equal(tok, "="))
@@ -966,9 +976,24 @@ static Node *stmt(Token **rest, Token *tok)
 
 bool is_typename(Token *tok)
 {
-    return equal(tok, "int") || equal(tok, "char") ||
-           equal(tok, "struct") || equal(tok, "union") ||
-           equal(tok, "long") || equal(tok, "short");
+    static char *kw[] = {
+        "void",
+        "char",
+        "short",
+        "int",
+        "long",
+        "struct",
+        "union",
+    };
+
+    for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
+    {
+        if (equal(tok, kw[i]))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 // compound_stmt = (declaration | stmt)* "}"
@@ -1013,6 +1038,11 @@ Token *function(Token *tok, Type *basety)
 
     Obj *fn = new_gvar(get_ident(ty->name), ty);
     fn->is_function = true;
+    fn->is_definition = !consume(&tok, tok, ";");
+    if (!fn->is_definition)
+    {
+        return tok;
+    }
 
     locals = NULL;
     enter_scope();
