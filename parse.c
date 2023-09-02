@@ -722,23 +722,26 @@ Type *declspec(Token **rest, Token *tok)
 {
     if (equal(tok, "char"))
     {
-        tok = skip(tok, "char");
-        *rest = tok;
+        *rest = tok->next;
         return ty_char;
     }
 
     if (equal(tok, "int"))
     {
-        tok = skip(tok, "int");
-        *rest = tok;
+        *rest = tok->next;
         return ty_int;
     }
 
     if (equal(tok, "long"))
     {
-        tok = skip(tok, "long");
-        *rest = tok;
+        *rest = tok->next;
         return ty_long;
+    }
+
+    if (equal(tok, "short"))
+    {
+        *rest = tok->next;
+        return ty_short;
     }
 
     if (equal(tok, "struct"))
@@ -955,7 +958,7 @@ bool is_typename(Token *tok)
 {
     return equal(tok, "int") || equal(tok, "char") ||
            equal(tok, "struct") || equal(tok, "union") ||
-           equal(tok, "long");
+           equal(tok, "long") || equal(tok, "short");
 }
 
 // compound_stmt = (declaration | stmt)* "}"

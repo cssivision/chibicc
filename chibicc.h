@@ -133,7 +133,8 @@ typedef enum
     TY_CHAR,
     TY_STRUCT,
     TY_UNION,
-    TY_LONG
+    TY_LONG,
+    TY_SHORT
 } TypeKind;
 
 struct Type
@@ -169,6 +170,7 @@ Type *array_of(Type *base, int len);
 extern Type *ty_int;
 extern Type *ty_char;
 extern Type *ty_long;
+extern Type *ty_short;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
