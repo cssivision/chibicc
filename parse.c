@@ -808,6 +808,8 @@ Type *declspec(Token **rest, Token *tok)
             break;
         case LONG:
         case LONG + INT:
+        case LONG + LONG:
+        case LONG + LONG + INT:
             ty = ty_long;
             break;
         default:
