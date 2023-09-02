@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "stdio.h"
 #include "stdarg.h"
+#include "stdint.h"
 #include "stdlib.h"
 #include "string.h"
 #include "ctype.h"
@@ -27,7 +28,7 @@ struct Token
 {
     TokenKind kind;
     Token *next;
-    int val;
+    int64_t val;
     char *loc;
     int len;
     Type *ty;
@@ -109,7 +110,7 @@ struct Node
     char *funcname;
     Node *args;
 
-    int val; // Used if kind == ND_NUM
+    int64_t val; // Used if kind == ND_NUM
 
     Obj *var; // Used if kind == ND_VAR
 
@@ -131,7 +132,8 @@ typedef enum
     TY_ARRAY,
     TY_CHAR,
     TY_STRUCT,
-    TY_UNION
+    TY_UNION,
+    TY_LONG
 } TypeKind;
 
 struct Type
@@ -166,6 +168,7 @@ Type *copy_type(Type *ty);
 Type *array_of(Type *base, int len);
 extern Type *ty_int;
 extern Type *ty_char;
+extern Type *ty_long;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);

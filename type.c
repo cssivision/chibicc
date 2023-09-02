@@ -2,6 +2,7 @@
 
 Type *ty_char = &(Type){TY_CHAR, 1, 1};
 Type *ty_int = &(Type){TY_INT, 4, 4};
+Type *ty_long = &(Type){TY_LONG, 8, 8};
 
 static Type *new_type(TypeKind kind, int size, int align)
 {
@@ -21,7 +22,7 @@ Type *copy_type(Type *ty)
 
 bool is_integer(Type *ty)
 {
-    return ty->kind == TY_INT || ty->kind == TY_CHAR;
+    return ty->kind == TY_INT || ty->kind == TY_CHAR || ty->kind == TY_LONG;
 }
 
 Type *pointer_to(Type *base)
@@ -89,7 +90,7 @@ void add_type(Node *node)
     case ND_NUM:
     case ND_FUNCCALL:
     {
-        node->ty = ty_int;
+        node->ty = ty_long;
         return;
     }
     case ND_MEMBER:

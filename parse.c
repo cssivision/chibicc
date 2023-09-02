@@ -120,7 +120,7 @@ Token *skip(Token *tok, char *op)
     return tok->next;
 }
 
-Node *new_num(int val, Token *tok)
+Node *new_num(int64_t val, Token *tok)
 {
     Node *node = new_node(ND_NUM, tok);
     node->val = val;
@@ -717,7 +717,7 @@ static Type *union_decl(Token **rest, Token *tok)
     return ty;
 }
 
-// declspec = "int" | "char" | struct-decl
+// declspec = "int" | "char" | "long" | struct-decl | union_decl
 Type *declspec(Token **rest, Token *tok)
 {
     if (equal(tok, "char"))
@@ -732,6 +732,13 @@ Type *declspec(Token **rest, Token *tok)
         tok = skip(tok, "int");
         *rest = tok;
         return ty_int;
+    }
+
+    if (equal(tok, "long"))
+    {
+        tok = skip(tok, "long");
+        *rest = tok;
+        return ty_long;
     }
 
     if (equal(tok, "struct"))
@@ -946,7 +953,9 @@ static Node *stmt(Token **rest, Token *tok)
 
 bool is_typename(Token *tok)
 {
-    return equal(tok, "int") || equal(tok, "char") || equal(tok, "struct") || equal(tok, "union");
+    return equal(tok, "int") || equal(tok, "char") ||
+           equal(tok, "struct") || equal(tok, "union") ||
+           equal(tok, "long");
 }
 
 // compound_stmt = (declaration | stmt)* "}"
