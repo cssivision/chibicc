@@ -179,3 +179,6 @@ Token *tokenize_file(char *path);
 Obj *parse(Token *tok);
 void codegen(Obj *prog, FILE *out);
 int align_to(int n, int align);
+
+#define unreachable() \
+    error("internal error at %s:%d", __FILE__, __LINE__)

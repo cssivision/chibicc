@@ -7,6 +7,7 @@ void gen_stmt(Node *node);
 static FILE *output_file;
 static int depth;
 static char *argreg8[] = {"%dil", "%sil", "%dl", "%cl", "%r8b", "%r9b"};
+static char *argreg32[] = {"%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"};
 static char *argreg64[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
 static Obj *current_fn;
 
@@ -49,6 +50,10 @@ static void load(Type *ty)
     {
         println("  movsbq (%%rax), %%rax");
     }
+    else if (ty->size == 4)
+    {
+        println("  movsxd (%%rax), %%rax");
+    }
     else
     {
         println("  mov (%%rax), %%rax");
@@ -73,6 +78,10 @@ static void store(Type *ty)
     if (ty->size == 1)
     {
         println("  mov %%al, (%%rdi)");
+    }
+    else if (ty->size == 4)
+    {
+        println("  mov %%eax, (%%rdi)");
     }
     else
     {
@@ -337,6 +346,23 @@ void emit_data(Obj *prog)
     }
 }
 
+static void store_gp(int r, int offset, int sz)
+{
+    switch (sz)
+    {
+    case 1:
+        println("  mov %s, %d(%%rbp)", argreg8[r], offset);
+        return;
+    case 4:
+        println("  mov %s, %d(%%rbp)", argreg32[r], offset);
+        return;
+    case 8:
+        println("  mov %s, %d(%%rbp)", argreg64[r], offset);
+        return;
+    }
+    unreachable();
+}
+
 void emit_text(Obj *prog)
 {
     for (Obj *fn = prog; fn; fn = fn->next)
@@ -358,14 +384,7 @@ void emit_text(Obj *prog)
         int i = 0;
         for (Obj *var = fn->params; var; var = var->next)
         {
-            if (var->ty->size == 1)
-            {
-                println("  mov %s, %d(%%rbp)", argreg8[i++], var->offset);
-            }
-            else
-            {
-                println("  mov %s, %d(%%rbp)", argreg64[i++], var->offset);
-            }
+            store_gp(i++, var->offset, var->ty->size);
         }
 
         gen_stmt(fn->body);
