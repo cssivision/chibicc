@@ -8,6 +8,7 @@ typedef struct
 
 Node *new_add(Node *lhs, Node *rhs, Token *tok);
 Node *expr(Token **rest, Token *tok);
+Type *typename(Token **rest, Token *tok);
 bool is_typename(Token *tok);
 Node *unary(Token **rest, Token *tok);
 Token *parse_typedef(Token *tok, Type *basety);
@@ -247,9 +248,11 @@ Obj *new_string_literal(char *str, Type *ty)
 //          | ident func-args?
 //          | num
 //          | sizeof unary
+//          | sizeof "(" type-name ")"
 //          | str
 Node *primary(Token **rest, Token *tok)
 {
+    Token *start = tok;
     if (equal(tok, "(") && equal(tok->next, "{"))
     {
         // This is a GNU statement expresssion.
@@ -266,6 +269,15 @@ Node *primary(Token **rest, Token *tok)
         Node *node = expr(&tok, tok->next);
         *rest = skip(tok, ")");
         return node;
+    }
+
+    if (equal(tok, "sizeof") && equal(tok->next, "(") && is_typename(tok->next->next))
+    {
+        tok = tok->next->next;
+        Type *ty = typename(&tok, tok);
+        tok = skip(tok, ")");
+        *rest = tok;
+        return new_num(ty->size, start);
     }
 
     if (equal(tok, "sizeof"))
@@ -918,6 +930,36 @@ Type *type_suffix(Token **rest, Token *tok, Type *ty)
         *rest = tok;
         return array_of(ty, len);
     }
+    *rest = tok;
+    return ty;
+}
+
+// abstract-declarator = "*"* ("(" abstract-declarator ")")? type-suffix
+static Type *abstract_declarator(Token **rest, Token *tok, Type *ty)
+{
+    while (equal(tok, "*"))
+    {
+        ty = pointer_to(ty);
+        tok = tok->next;
+    }
+
+    if (equal(tok, "("))
+    {
+        Token *start = tok;
+        Type dummy = {};
+        abstract_declarator(&tok, start->next, &dummy);
+        tok = skip(tok, ")");
+        ty = type_suffix(rest, tok, ty);
+        return abstract_declarator(&tok, start->next, ty);
+    }
+
+    return type_suffix(rest, tok, ty);
+}
+
+Type *typename(Token **rest, Token *tok)
+{
+    Type *basety = declspec(&tok, tok, NULL);
+    Type *ty = abstract_declarator(&tok, tok, basety);
     *rest = tok;
     return ty;
 }
