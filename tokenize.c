@@ -106,7 +106,7 @@ bool is_keywords(Token *tok)
 {
     static char *kw[] = {"return", "if", "else", "while", "int",
                          "sizeof", "char", "struct", "union", "short",
-                         "long", "void"};
+                         "long", "void", "typedef"};
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
         if (equal(tok, kw[i]))
