@@ -901,7 +901,7 @@ Type *func_params(Token **rest, Token *tok)
     return ty;
 }
 
-int get_num(Token *tok)
+static int64_t get_num(Token *tok)
 {
     if (tok->kind != TK_NUM)
     {
