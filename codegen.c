@@ -86,7 +86,7 @@ static void store(Type *ty)
     }
     else if (ty->size == 2)
     {
-        println("  move %%ax, (%%rdi)");
+        println("  mov %%ax, (%%rdi)");
     }
     else if (ty->size == 4)
     {
@@ -129,6 +129,55 @@ void gen_addr(Node *node)
     }
 
     error_tok(node->tok, "not an lvalue");
+}
+
+enum
+{
+    I8,
+    I16,
+    I32,
+    I64
+};
+
+int get_type_id(Type *ty)
+{
+    switch (ty->kind)
+    {
+    case TY_CHAR:
+        return I8;
+    case TY_SHORT:
+        return I16;
+    case TY_INT:
+        return I32;
+    }
+    return I64;
+}
+
+// The table for type casts
+static char i32i8[] = "movsbl %al, %eax";
+static char i32i16[] = "movswl %ax, %eax";
+static char i32i64[] = "movsxd %eax, %rax";
+
+static char *cast_table[][10] = {
+    {NULL, NULL, NULL, i32i64},    // i8
+    {i32i8, NULL, NULL, i32i64},   // i16
+    {i32i8, i32i16, NULL, i32i64}, // i32
+    {i32i8, i32i16, NULL, NULL},   // i64
+};
+
+static void cast(Type *from, Type *to)
+{
+    if (to->kind == TY_VOID)
+    {
+        return;
+    }
+
+    int t1 = get_type_id(from);
+    int t2 = get_type_id(to);
+    if (cast_table[t1][t2])
+    {
+        println("  %s", cast_table[t1][t2]);
+    }
 }
 
 void gen_expr(Node *node)
@@ -189,6 +238,12 @@ void gen_expr(Node *node)
 
         println("  mov $0, %%rax");
         println("  call %s", node->funcname);
+        return;
+    }
+    case ND_CAST:
+    {
+        gen_expr(node->lhs);
+        cast(node->lhs->ty, node->ty);
         return;
     }
     }

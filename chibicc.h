@@ -65,6 +65,7 @@ typedef enum
     TK_STR,      // "str"
     ND_COMMA,    // ,
     ND_MEMBER,   // .
+    ND_CAST,     // type cast
 
     ND_RETURN,    // return
     ND_BLOCK,     // { .. }
