@@ -1,5 +1,7 @@
 #include "chibicc.h"
 
+static Obj *current_fn;
+
 // Variable attributes such as typedef or extern.
 typedef struct
 {
@@ -239,6 +241,7 @@ Node *funccall(Token **rest, Token *tok)
     }
     tok = skip(tok, ")");
     node->args = head.next;
+    node->ty = sc->var->ty->return_ty;
     *rest = tok;
     return node;
 }
@@ -922,7 +925,7 @@ Type *declspec(Token **rest, Token *tok, VarAttr *attr)
 
 // func-params = param ("," param)*
 // param = declspec declarator
-Type *func_params(Token **rest, Token *tok)
+Type *func_params(Token **rest, Token *tok, Type *ty)
 {
     Type head = {};
     Type *cur = &head;
@@ -937,7 +940,7 @@ Type *func_params(Token **rest, Token *tok)
         Type *ty = declarator(&tok, tok, basety);
         cur = cur->next = copy_type(ty);
     }
-    Type *ty = func_type(ty);
+    ty = func_type(ty);
     ty->params = head.next;
     *rest = tok;
     return ty;
@@ -958,7 +961,7 @@ Type *type_suffix(Token **rest, Token *tok, Type *ty)
 {
     if (equal(tok, "("))
     {
-        Type *ty = func_params(&tok, tok->next);
+        ty = func_params(&tok, tok->next, ty);
         tok = skip(tok, ")");
         *rest = tok;
         return ty;
@@ -1137,9 +1140,12 @@ static Node *stmt(Token **rest, Token *tok)
 
     if (equal(tok, "return"))
     {
-        Token *start = tok;
-        Node *node = new_unary(ND_RETURN, expr(&tok, tok->next), start);
+        Node *node = new_node(ND_RETURN, tok);
+        Node *exp = expr(&tok, tok->next);
         tok = skip(tok, ";");
+        add_type(exp);
+
+        node->lhs = new_cast(exp, current_fn->ty->return_ty);
         *rest = tok;
         return node;
     }
@@ -1231,6 +1237,7 @@ Token *function(Token *tok, Type *basety)
         return tok;
     }
 
+    current_fn = fn;
     locals = NULL;
     enter_scope();
     create_param_lvars(ty->params);
