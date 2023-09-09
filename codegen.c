@@ -49,11 +49,11 @@ static void load(Type *ty)
 
     if (ty->size == 1)
     {
-        println("  movsbq (%%rax), %%rax");
+        println("  movsbl (%%rax), %%eax");
     }
     else if (ty->size == 2)
     {
-        println("  movswq (%%rax), %%rax");
+        println("  movsbl (%%rax), %%eax");
     }
     else if (ty->size == 4)
     {

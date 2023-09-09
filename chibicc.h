@@ -168,6 +168,7 @@ bool is_integer(Type *ty);
 void add_type(Node *node);
 Type *pointer_to(Type *base);
 Type *func_type(Type *return_ty);
+Node *new_cast(Node *lhs, Type *ty);
 Type *copy_type(Type *ty);
 Type *array_of(Type *base, int len);
 extern Type *ty_int;
