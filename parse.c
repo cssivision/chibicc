@@ -211,6 +211,15 @@ Obj *new_gvar(char *name, Type *ty)
 Node *funccall(Token **rest, Token *tok)
 {
     Node *node = new_node(ND_FUNCCALL, tok);
+    VarScope *sc = find_var(tok);
+    if (!sc)
+    {
+        error_tok(tok, "implicit declaration of a function");
+    }
+    if (!sc->var || sc->var->ty->kind != TY_FUNC)
+    {
+        error_tok(tok, "not a function");
+    }
     node->funcname = strndup(tok->loc, tok->len);
     tok = tok->next;
     tok = skip(tok, "(");
@@ -226,6 +235,7 @@ Node *funccall(Token **rest, Token *tok)
             tok = skip(tok, ",");
         }
         cur = cur->next = assign(&tok, tok);
+        add_type(cur);
     }
     tok = skip(tok, ")");
     node->args = head.next;
