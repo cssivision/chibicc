@@ -225,10 +225,11 @@ Node *funccall(Token **rest, Token *tok)
     node->funcname = strndup(tok->loc, tok->len);
     tok = tok->next;
     tok = skip(tok, "(");
+    Type *ty = sc->var->ty;
+    Type *param_ty = ty->params;
 
     Node head = {};
     Node *cur = &head;
-
     int i = 0;
     while (!equal(tok, ")"))
     {
@@ -236,12 +237,23 @@ Node *funccall(Token **rest, Token *tok)
         {
             tok = skip(tok, ",");
         }
-        cur = cur->next = assign(&tok, tok);
-        add_type(cur);
+        Node *arg = assign(&tok, tok);
+        add_type(arg);
+        if (param_ty)
+        {
+            if (param_ty->kind == TY_STRUCT || param_ty->kind == TY_UNION)
+            {
+                error_tok(arg->tok, "passing struct or union is not supported yet");
+            }
+            arg = new_cast(arg, param_ty);
+            param_ty = param_ty->next;
+        }
+        cur = cur->next = arg;
     }
     tok = skip(tok, ")");
     node->args = head.next;
-    node->ty = sc->var->ty->return_ty;
+    node->ty = ty->return_ty;
+    node->func_ty = ty;
     *rest = tok;
     return node;
 }

@@ -62,7 +62,6 @@ typedef enum
     ND_NUM,      // Integer
     ND_VAR,      // Variable
     ND_FUNCCALL, // Function call
-    TK_STR,      // "str"
     ND_COMMA,    // ,
     ND_MEMBER,   // .
     ND_CAST,     // type cast
@@ -111,6 +110,7 @@ struct Node
 
     char *funcname;
     Node *args;
+    Type *func_ty;
 
     int64_t val; // Used if kind == ND_NUM
 
@@ -137,7 +137,8 @@ typedef enum
     TY_STRUCT,
     TY_UNION,
     TY_LONG,
-    TY_SHORT
+    TY_SHORT,
+    TK_STR // "str"
 } TypeKind;
 
 struct Type
