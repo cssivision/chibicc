@@ -1,6 +1,7 @@
 #include "chibicc.h"
 
 Type *ty_void = &(Type){TY_VOID, 1, 1};
+Type *ty_bool = &(Type){TY_BOOL, 1, 1};
 Type *ty_char = &(Type){TY_CHAR, 1, 1};
 Type *ty_short = &(Type){TY_SHORT, 2, 2};
 Type *ty_int = &(Type){TY_INT, 4, 4};
@@ -25,7 +26,8 @@ Type *copy_type(Type *ty)
 bool is_integer(Type *ty)
 {
     return ty->kind == TY_INT || ty->kind == TY_CHAR ||
-           ty->kind == TY_LONG || ty->kind == TY_SHORT;
+           ty->kind == TY_LONG || ty->kind == TY_SHORT ||
+           ty->kind == TY_BOOL;
 }
 
 Type *pointer_to(Type *base)

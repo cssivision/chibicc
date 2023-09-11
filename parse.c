@@ -665,7 +665,8 @@ Node *assign(Token **rest, Token *tok)
     Node *node = equality(&tok, tok);
     if (equal(tok, "="))
     {
-        node = new_binary(ND_ASSIGN, node, assign(&tok, tok->next), tok);
+        Node *rhs = assign(&tok, tok->next);
+        node = new_binary(ND_ASSIGN, node, rhs, tok);
     }
     *rest = tok;
     return node;
@@ -808,7 +809,7 @@ static Type *union_decl(Token **rest, Token *tok)
     return ty;
 }
 
-// declspec = ( "void" | "int" | "char" | "long" | "typedef"
+// declspec = ( "void" | "int" | "char" | _Bool | "long" | "typedef"
 //              struct-decl | union_decl  | typedef-name )+
 //
 // The order of typenames in a type-specifier doesn't matter. For
@@ -831,11 +832,12 @@ Type *declspec(Token **rest, Token *tok, VarAttr *attr)
     enum
     {
         VOID = 1 << 0,
-        CHAR = 1 << 2,
-        SHORT = 1 << 4,
-        INT = 1 << 6,
-        LONG = 1 << 8,
-        OTHER = 1 << 10,
+        BOOL = 1 << 2,
+        CHAR = 1 << 4,
+        SHORT = 1 << 6,
+        INT = 1 << 8,
+        LONG = 1 << 10,
+        OTHER = 1 << 12,
     };
 
     Type *ty = ty_int;
@@ -899,6 +901,10 @@ Type *declspec(Token **rest, Token *tok, VarAttr *attr)
         {
             counter += SHORT;
         }
+        else if (equal(tok, "_Bool"))
+        {
+            counter += BOOL;
+        }
         else
         {
             unreachable();
@@ -908,6 +914,9 @@ Type *declspec(Token **rest, Token *tok, VarAttr *attr)
         {
         case VOID:
             ty = ty_void;
+            break;
+        case BOOL:
+            ty = ty_bool;
             break;
         case CHAR:
             ty = ty_char;
@@ -1182,6 +1191,7 @@ bool is_typename(Token *tok)
         "struct",
         "union",
         "typedef",
+        "_Bool",
     };
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)

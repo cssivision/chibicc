@@ -165,10 +165,30 @@ static char *cast_table[][10] = {
     {i32i8, i32i16, NULL, NULL},   // i64
 };
 
+void cmp_zero(Type *ty)
+{
+    if (is_integer(ty) && ty->size < 4)
+    {
+        println("  cmp $0, %%eax");
+    }
+    else
+    {
+        println("  cmp $0, %%rax");
+    }
+}
+
 static void cast(Type *from, Type *to)
 {
     if (to->kind == TY_VOID)
     {
+        return;
+    }
+
+    if (to->kind == TY_BOOL)
+    {
+        cmp_zero(from);
+        println("  setne %%al");
+        println("  movzx %%al, %%eax");
         return;
     }
 

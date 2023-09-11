@@ -134,6 +134,7 @@ typedef enum
     TY_ARRAY,
     TY_CHAR,
     TY_VOID,
+    TY_BOOL,
     TY_STRUCT,
     TY_UNION,
     TY_LONG,
@@ -177,6 +178,7 @@ extern Type *ty_char;
 extern Type *ty_long;
 extern Type *ty_short;
 extern Type *ty_void;
+extern Type *ty_bool;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
