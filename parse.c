@@ -6,6 +6,7 @@ static Obj *current_fn;
 typedef struct
 {
     bool is_typedef;
+    bool is_static;
 } VarAttr;
 
 Node *new_add(Node *lhs, Node *rhs, Token *tok);
@@ -893,7 +894,7 @@ Type *enum_specifier(Token **rest, Token *tok)
     return ty;
 }
 
-// declspec = ( "void" | "int" | "char" | _Bool | "long" | "typedef"
+// declspec = ( "void" | "int" | "char" | _Bool | "long" | "typedef" | "static"
 //              struct-decl | union_decl  | typedef-name )+
 //
 // The order of typenames in a type-specifier doesn't matter. For
@@ -929,13 +930,24 @@ Type *declspec(Token **rest, Token *tok, VarAttr *attr)
 
     while (is_typename(tok))
     {
-        if (equal(tok, "typedef"))
+        if (equal(tok, "typedef") || equal(tok, "static"))
         {
             if (!attr)
             {
                 error_tok(tok, "storage class specifier is not allowed in this context");
             }
-            attr->is_typedef = true;
+            if (equal(tok, "typedef"))
+            {
+                attr->is_typedef = true;
+            }
+            else
+            {
+                attr->is_static = true;
+            }
+            if (attr->is_typedef + attr->is_static > 1)
+            {
+                error_tok(tok, "typedef and static may not be used together");
+            }
             tok = tok->next;
             continue;
         }
@@ -1281,6 +1293,7 @@ bool is_typename(Token *tok)
         "typedef",
         "_Bool",
         "enum",
+        "static",
     };
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
@@ -1336,13 +1349,14 @@ void create_param_lvars(Type *param)
 }
 
 // function = declspec declarator "{" compound_stmt
-Token *function(Token *tok, Type *basety)
+Token *function(Token *tok, Type *basety, VarAttr *attr)
 {
     Type *ty = declarator(&tok, tok, basety);
 
     Obj *fn = new_gvar(get_ident(ty->name), ty);
     fn->is_function = true;
     fn->is_definition = !consume(&tok, tok, ";");
+    fn->is_static = attr->is_static;
     if (!fn->is_definition)
     {
         return tok;
@@ -1421,7 +1435,7 @@ Obj *parse(Token *tok)
 
         if (is_function(tok))
         {
-            tok = function(tok, basety);
+            tok = function(tok, basety, &attr);
             continue;
         }
         tok = global_variable(tok, basety);
