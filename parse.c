@@ -688,6 +688,29 @@ Node *assign(Token **rest, Token *tok)
         Node *rhs = assign(&tok, tok->next);
         node = new_binary(ND_ASSIGN, node, rhs, tok);
     }
+    if (equal(tok, "+="))
+    {
+        Node *rhs = new_add(node, assign(&tok, tok->next), tok);
+        node = new_binary(ND_ASSIGN, node, rhs, tok);
+    }
+
+    if (equal(tok, "-="))
+    {
+        Node *rhs = new_sub(node, assign(&tok, tok->next), tok);
+        node = new_binary(ND_ASSIGN, node, rhs, tok);
+    }
+
+    if (equal(tok, "*="))
+    {
+        Node *rhs = new_binary(ND_MUL, node, assign(&tok, tok->next), tok);
+        node = new_binary(ND_ASSIGN, node, rhs, tok);
+    }
+
+    if (equal(tok, "/="))
+    {
+        Node *rhs = new_binary(ND_DIV, node, assign(&tok, tok->next), tok);
+        node = new_binary(ND_ASSIGN, node, rhs, tok);
+    }
     *rest = tok;
     return node;
 }
