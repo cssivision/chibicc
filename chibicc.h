@@ -22,6 +22,7 @@ typedef enum
     TK_NUM,
     TK_KEYWORD,
     TK_EOF,
+    TK_STR // "str"
 } TokenKind;
 
 struct Token
@@ -139,7 +140,7 @@ typedef enum
     TY_UNION,
     TY_LONG,
     TY_SHORT,
-    TK_STR // "str"
+    TY_ENUM
 } TypeKind;
 
 struct Type
@@ -172,6 +173,7 @@ Type *pointer_to(Type *base);
 Type *func_type(Type *return_ty);
 Node *new_cast(Node *lhs, Type *ty);
 Type *copy_type(Type *ty);
+Type *enum_type();
 Type *array_of(Type *base, int len);
 extern Type *ty_int;
 extern Type *ty_char;
