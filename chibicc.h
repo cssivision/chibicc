@@ -61,6 +61,7 @@ typedef enum
     ND_ASSIGN,   // =
     ND_ADDR,     // &
     ND_DEREF,    // *
+    ND_NOT,      // !
     ND_NUM,      // Integer
     ND_VAR,      // Variable
     ND_FUNCCALL, // Function call

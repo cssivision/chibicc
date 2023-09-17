@@ -521,6 +521,13 @@ Node *unary(Token **rest, Token *tok)
         return node;
     }
 
+    if (equal(tok, "!"))
+    {
+        Node *node = new_unary(ND_NOT, cast(&tok, tok->next), tok);
+        *rest = tok;
+        return node;
+    }
+
     if (equal(tok, "-"))
     {
         Node *node = new_unary(ND_NEG, cast(&tok, tok->next), tok);

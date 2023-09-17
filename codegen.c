@@ -221,6 +221,12 @@ void gen_expr(Node *node)
         gen_expr(node->lhs);
         load(node->ty);
         return;
+    case ND_NOT:
+        gen_expr(node->lhs);
+        println("  cmp $0, %%rax");
+        println("  sete %%al");
+        println("  movzx %%al, %%rax");
+        return;
     case ND_NEG:
         gen_expr(node->lhs);
         println("  neg %%rax");

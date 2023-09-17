@@ -119,6 +119,11 @@ void add_type(Node *node)
         node->ty = ty;
         return;
     }
+    case ND_NOT:
+    {
+        node->ty = ty_int;
+        return;
+    }
     case ND_ASSIGN:
     {
         if (node->lhs->ty->kind == TY_ARRAY)
