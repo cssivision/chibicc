@@ -509,7 +509,7 @@ Node *cast(Token **rest, Token *tok)
     return unary(rest, tok);
 }
 
-// unary = ("+" | "-" | "&" | "*" ) cast
+// unary = ("+" | "-" | "&" | "*" | "!" | "~") cast
 //       | ("++" | "--") unary
 //       | postfix
 Node *unary(Token **rest, Token *tok)
@@ -524,6 +524,13 @@ Node *unary(Token **rest, Token *tok)
     if (equal(tok, "!"))
     {
         Node *node = new_unary(ND_NOT, cast(&tok, tok->next), tok);
+        *rest = tok;
+        return node;
+    }
+
+    if (equal(tok, "~"))
+    {
+        Node *node = new_unary(ND_BITNOT, cast(&tok, tok->next), tok);
         *rest = tok;
         return node;
     }

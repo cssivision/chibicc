@@ -227,6 +227,10 @@ void gen_expr(Node *node)
         println("  sete %%al");
         println("  movzx %%al, %%rax");
         return;
+    case ND_BITNOT:
+        gen_expr(node->lhs);
+        println("  not %%rax");
+        return;
     case ND_NEG:
         gen_expr(node->lhs);
         println("  neg %%rax");
