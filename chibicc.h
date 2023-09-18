@@ -42,6 +42,7 @@ struct Token
 struct Member
 {
     Member *next;
+    Token *tok;
     Type *ty;
     Token *name;
     int offset;

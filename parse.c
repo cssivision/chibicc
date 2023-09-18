@@ -12,6 +12,7 @@ typedef struct
 Node *new_add(Node *lhs, Node *rhs, Token *tok);
 Node *new_sub(Node *lhs, Node *rhs, Token *tok);
 Node *expr(Token **rest, Token *tok);
+Type *type_suffix(Token **rest, Token *tok, Type *ty);
 Type *typename(Token **rest, Token *tok);
 char *get_ident(Token *tok);
 long get_num(Token *tok);
@@ -1260,8 +1261,26 @@ long get_num(Token *tok)
     return tok->val;
 }
 
+// array-dimensions = num? "]" type-suffix
+Type *array_dimensions(Token **rest, Token *tok, Type *ty)
+{
+    if (equal(tok, "]"))
+    {
+        tok = tok->next;
+        ty = type_suffix(&tok, tok, ty);
+        *rest = tok;
+        return array_of(ty, -1);
+    }
+
+    int len = get_num(tok);
+    tok = skip(tok->next, "]");
+    ty = type_suffix(&tok, tok, ty);
+    *rest = tok;
+    return array_of(ty, len);
+}
+
 // type-suffix = ("(" func-params? ")")?
-//               | "[" num "]" type-suffix
+//               | "[" array-dimensions
 Type *type_suffix(Token **rest, Token *tok, Type *ty)
 {
     if (equal(tok, "("))
@@ -1271,14 +1290,13 @@ Type *type_suffix(Token **rest, Token *tok, Type *ty)
         *rest = tok;
         return ty;
     }
+
     if (equal(tok, "["))
     {
         tok = tok->next;
-        int len = get_num(tok);
-        tok = skip(tok->next, "]");
-        ty = type_suffix(&tok, tok, ty);
+        ty = array_dimensions(&tok, tok, ty);
         *rest = tok;
-        return array_of(ty, len);
+        return ty;
     }
     *rest = tok;
     return ty;
@@ -1367,6 +1385,10 @@ Node *declaration(Token **rest, Token *tok, Type *basety)
         }
 
         Type *ty = declarator(&tok, tok, basety);
+        if (ty->size < 0)
+        {
+            error_tok(tok, "variable has incomplete type");
+        }
         if (ty->kind == TY_VOID)
         {
             error_tok(tok, "variable declared void");
