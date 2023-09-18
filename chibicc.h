@@ -64,6 +64,9 @@ typedef enum
     ND_DEREF,    // *
     ND_NOT,      // !
     ND_BITNOT,   // ~
+    ND_BITOR,    // |
+    ND_BITXOR,   // ^
+    ND_BITAND,   // &
     ND_NUM,      // Integer
     ND_VAR,      // Variable
     ND_FUNCCALL, // Function call
