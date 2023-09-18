@@ -12,6 +12,12 @@ static char *argreg32[] = {"%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"};
 static char *argreg64[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
 static Obj *current_fn;
 
+static int count(void)
+{
+    static int i = 1;
+    return i++;
+}
+
 static void println(char *fmt, ...)
 {
     va_list ap;
@@ -231,6 +237,38 @@ void gen_expr(Node *node)
         gen_expr(node->lhs);
         println("  not %%rax");
         return;
+    case ND_LOGAND:
+    {
+        int c = count();
+        gen_expr(node->lhs);
+        println("  cmp $0, %%rax");
+        println("  je .L.false.%d", c);
+        gen_expr(node->rhs);
+        println("  cmp $0, %%rax");
+        println("  je .L.false.%d", c);
+        println("  mov $1, %%rax");
+        println("  jmp .L.end.%d", c);
+        println(".L.false.%d:", c);
+        println("  mov $0, %%rax");
+        println(".L.end.%d:", c);
+        return;
+    }
+    case ND_LOGOR:
+    {
+        int c = count();
+        gen_expr(node->lhs);
+        println("  cmp $0, %%rax");
+        println("  jne .L.true.%d", c);
+        gen_expr(node->rhs);
+        println("  cmp $0, %%rax");
+        println("  jne .L.true.%d", c);
+        println("  mov $0, %%rax");
+        println("  jmp .L.end.%d", c);
+        println(".L.true.%d:", c);
+        println("  mov $1, %%rax");
+        println(".L.end.%d:", c);
+        return;
+    }
     case ND_NEG:
         gen_expr(node->lhs);
         println("  neg %%rax");
@@ -351,12 +389,6 @@ void gen_expr(Node *node)
     }
 
     error_tok(node->tok, "invalid expression");
-}
-
-static int count(void)
-{
-    static int i = 1;
-    return i++;
 }
 
 void gen_stmt(Node *node)

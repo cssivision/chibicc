@@ -797,11 +797,37 @@ Node * bitor (Token * *rest, Token *tok)
     return node;
 }
 
+// logand = bitor ("||" logand)*
+Node *logand(Token **rest, Token *tok)
+{
+    Node *node = bitor (&tok, tok);
+    while (equal(tok, "&&"))
+    {
+        Token *start = tok;
+        node = new_binary(ND_LOGAND, node, logand(&tok, tok->next), start);
+    }
+    *rest = tok;
+    return node;
+}
+
+// logor = logand ("||" logor)*
+Node *logor(Token **rest, Token *tok)
+{
+    Node *node = logand(&tok, tok);
+    while (equal(tok, "||"))
+    {
+        Token *start = tok;
+        node = new_binary(ND_LOGOR, node, logor(&tok, tok->next), start);
+    }
+    *rest = tok;
+    return node;
+}
+
 // assign = bitor (assign-op assign)?
 // assign-op = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "|=" | "^=" | "&="
 Node *assign(Token **rest, Token *tok)
 {
-    Node *node = bitor (&tok, tok);
+    Node *node = logor(&tok, tok);
     if (equal(tok, "="))
     {
         Node *rhs = assign(&tok, tok->next);
