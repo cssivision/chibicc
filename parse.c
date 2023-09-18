@@ -928,7 +928,7 @@ void struct_members(Token **rest, Token *tok, Type *ty)
         }
         tok = skip(tok, ";");
     }
-    tok = skip(tok, "}");
+    tok = tok->next;
     *rest = tok;
     ty->members = head.next;
 }
@@ -946,30 +946,39 @@ Type *struct_union_decl(Token **rest, Token *tok)
     if (tag && !equal(tok, "{"))
     {
         Type *ty = find_tag(tag);
-        if (!ty)
+        if (ty)
         {
-            error_tok(tag, "unknow type");
+            *rest = tok;
+            return ty;
         }
-        if (ty->kind != TY_STRUCT && ty->kind != TY_UNION)
-        {
-            error_tok(tag, "not an tag");
-        }
+
+        ty = struct_type();
+        ty->size = -1;
+        push_tag_scope(tag, ty);
         *rest = tok;
         return ty;
     }
 
     tok = skip(tok, "{");
 
-    Type *ty = calloc(1, sizeof(Type));
-    ty->kind = TY_STRUCT;
+    Type *ty = struct_type();
     struct_members(&tok, tok, ty);
-    ty->align = 1;
+    *rest = tok;
 
     if (tag)
     {
+        // If this is a redefinition, overwrite a previous type.
+        // Otherwise, register the struct type.
+        for (TagScope *sc = scope->tags; sc; sc = sc->next)
+        {
+            if (equal(tag, sc->name))
+            {
+                *sc->ty = *ty;
+                return sc->ty;
+            }
+        }
         push_tag_scope(tag, ty);
     }
-    *rest = tok;
     return ty;
 }
 
@@ -977,6 +986,11 @@ static Type *struct_decl(Token **rest, Token *tok)
 {
     Type *ty = struct_union_decl(&tok, tok);
     ty->kind = TY_STRUCT;
+    if (ty->size < 0)
+    {
+        *rest = tok;
+        return ty;
+    }
 
     // Assign offsets within the struct to members.
     int offset = 0;
@@ -1629,7 +1643,7 @@ Token *global_variable(Token *tok, Type *basety)
     return tok;
 }
 
-// typedef = (declatator ("," declarator)*)*
+// typedef = (declarator ("," declarator)*)*
 Token *parse_typedef(Token *tok, Type *basety)
 {
     int i = 0;

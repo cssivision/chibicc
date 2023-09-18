@@ -185,6 +185,7 @@ Type *func_type(Type *return_ty);
 Node *new_cast(Node *lhs, Type *ty);
 Type *copy_type(Type *ty);
 Type *enum_type();
+Type *struct_type();
 Type *array_of(Type *base, int len);
 extern Type *ty_int;
 extern Type *ty_char;

@@ -26,6 +26,13 @@ Type *copy_type(Type *ty)
 Type *enum_type()
 {
     Type *ty = new_type(TY_ENUM, 4, 4);
+    return ty;
+}
+
+Type *struct_type()
+{
+    Type *ty = new_type(TY_STRUCT, 0, 1);
+    return ty;
 }
 
 bool is_integer(Type *ty)
