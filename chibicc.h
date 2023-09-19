@@ -77,6 +77,8 @@ typedef enum
     ND_MEMBER,   // .
     ND_CAST,     // type cast
 
+    ND_GOTO,      // goto
+    ND_LABEL,     // label
     ND_RETURN,    // return
     ND_BLOCK,     // { .. }
     ND_IF,        // if
@@ -117,6 +119,11 @@ struct Node
     Token *tok; // Representative token
     Node *lhs;
     Node *rhs;
+
+    // Goto or labeled statement
+    char *label;
+    char *unique_label;
+    Node *goto_next;
 
     Node *body; // use if kind == ND_BLOCK
 

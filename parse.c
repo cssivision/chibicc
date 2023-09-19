@@ -1,6 +1,9 @@
 #include "chibicc.h"
 
 static Obj *current_fn;
+// Lists of all goto statements and labels in the curent function.
+static Node *gotos;
+static Node *labels;
 
 // Variable attributes such as typedef or extern.
 typedef struct
@@ -1441,8 +1444,34 @@ Node *declaration(Token **rest, Token *tok, Type *basety)
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "for" "(" expr-stmt expr? ";" expr? ")" stmt
 //      | "while" "(" expr ")" stmt
+//      | goto ident ";"
+//      | ident ":" stmt
 static Node *stmt(Token **rest, Token *tok)
 {
+    if (equal(tok, "goto"))
+    {
+        Node *node = new_node(ND_GOTO, tok);
+        tok = tok->next;
+        node->label = get_ident(tok);
+        tok = skip(tok->next, ";");
+        node->goto_next = gotos;
+        gotos = node;
+        *rest = tok;
+        return node;
+    }
+
+    if (tok->kind == TK_IDENT && equal(tok->next, ":"))
+    {
+        Node *node = new_node(ND_LABEL, tok);
+        node->label = get_ident(tok);
+        node->unique_label = new_unique_name();
+        node->goto_next = labels;
+        labels = node;
+        node->lhs = stmt(&tok, tok->next->next);
+        *rest = tok;
+        return node;
+    }
+
     if (equal(tok, "while"))
     {
         tok = skip(tok->next, "(");
@@ -1588,6 +1617,31 @@ void create_param_lvars(Type *param)
     }
 }
 
+// This function matches gotos with labels.
+//
+// We cannot resolve gotos as we parse a function because gotos
+// can refer a label that appears later in the function.
+// So, we need to do this after we parse the entire function.
+static void resolve_goto_labels(void)
+{
+    for (Node *x = gotos; x; x = x->goto_next)
+    {
+        for (Node *y = labels; y; y = y->goto_next)
+        {
+            if (!strcmp(x->label, y->label))
+            {
+                x->unique_label = y->unique_label;
+                break;
+            }
+        }
+        if (x->unique_label == NULL)
+        {
+            error_tok(x->tok->next, "use of undeclared label");
+        }
+    }
+    gotos = labels = NULL;
+}
+
 // function = declspec declarator "{" compound_stmt
 Token *function(Token *tok, Type *basety, VarAttr *attr)
 {
@@ -1612,6 +1666,7 @@ Token *function(Token *tok, Type *basety, VarAttr *attr)
     fn->body = compound_stmt(&tok, tok);
     fn->locals = locals;
     leave_scope();
+    resolve_goto_labels();
     return tok;
 }
 
