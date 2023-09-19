@@ -125,6 +125,9 @@ struct Node
     char *unique_label;
     Node *goto_next;
 
+    // "break" label
+    char *brk_label;
+
     Node *body; // use if kind == ND_BLOCK
 
     char *funcname;

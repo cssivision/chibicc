@@ -5,6 +5,9 @@ static Obj *current_fn;
 static Node *gotos;
 static Node *labels;
 
+// Current "goto" jump target.
+static char *brk_label;
+
 // Variable attributes such as typedef or extern.
 typedef struct
 {
@@ -1445,9 +1448,20 @@ Node *declaration(Token **rest, Token *tok, Type *basety)
 //      | "for" "(" expr-stmt expr? ";" expr? ")" stmt
 //      | "while" "(" expr ")" stmt
 //      | goto ident ";"
+//      | break ";"
 //      | ident ":" stmt
 static Node *stmt(Token **rest, Token *tok)
 {
+    if (equal(tok, "break"))
+    {
+        if (!brk_label)
+            error_tok(tok, "stray break");
+        Node *node = new_node(ND_GOTO, tok);
+        node->unique_label = brk_label;
+        *rest = skip(tok->next, ";");
+        return node;
+    }
+
     if (equal(tok, "goto"))
     {
         Node *node = new_node(ND_GOTO, tok);
@@ -1478,7 +1492,11 @@ static Node *stmt(Token **rest, Token *tok)
         Node *node = new_node(ND_FOR, tok);
         node->cond = expr(&tok, tok);
         tok = skip(tok, ")");
+
+        char *brk = brk_label;
+        brk_label = node->brk_label = new_unique_name();
         node->then = stmt(&tok, tok);
+        brk_label = brk;
         *rest = tok;
         return node;
     }
@@ -1488,6 +1506,10 @@ static Node *stmt(Token **rest, Token *tok)
         Node *node = new_node(ND_FOR, tok);
         tok = skip(tok->next, "(");
         enter_scope();
+
+        char *brk = brk_label;
+        brk_label = node->brk_label = new_unique_name();
+
         if (is_typename(tok))
         {
             Type *basety = declspec(&tok, tok, NULL);
@@ -1510,6 +1532,7 @@ static Node *stmt(Token **rest, Token *tok)
         node->then = stmt(&tok, tok);
         *rest = tok;
         leave_scope();
+        brk_label = brk;
         return node;
     }
 
