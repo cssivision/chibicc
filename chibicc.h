@@ -127,6 +127,8 @@ struct Node
 
     // "break" label
     char *brk_label;
+    // "continue" lable
+    char *cont_label;
 
     Node *body; // use if kind == ND_BLOCK
 
