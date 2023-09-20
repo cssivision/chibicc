@@ -9,6 +9,10 @@ static Node *labels;
 char *brk_label;
 char *cont_label;
 
+// Points to a node representing a switch if we are parsing
+// a switch statement. Otherwise, NULL.
+static Node *current_switch;
+
 // Variable attributes such as typedef or extern.
 typedef struct
 {
@@ -1446,6 +1450,9 @@ Node *declaration(Token **rest, Token *tok, Type *basety)
 //      | expr-stmt
 //      | "{" compound-stmt
 //      | "if" "(" expr ")" stmt ("else" stmt)?
+//      | "switch" "(" expr ")" stmt
+//      | "case" num ":" stmt
+//      | "default" ":" stmt
 //      | "for" "(" expr-stmt expr? ";" expr? ")" stmt
 //      | "while" "(" expr ")" stmt
 //      | goto ident ";"
@@ -1453,6 +1460,60 @@ Node *declaration(Token **rest, Token *tok, Type *basety)
 //      | ident ":" stmt
 static Node *stmt(Token **rest, Token *tok)
 {
+    if (equal(tok, "switch"))
+    {
+        Node *node = new_node(ND_SWITCH, tok);
+        tok = skip(tok->next, "(");
+        node->cond = expr(&tok, tok);
+        tok = skip(tok, ")");
+
+        Node *sw = current_switch;
+        current_switch = node;
+
+        char *brk = brk_label;
+        brk_label = node->brk_label = new_unique_name();
+        node->then = stmt(&tok, tok);
+        current_switch = sw;
+        brk_label = brk;
+
+        *rest = tok;
+        return node;
+    }
+
+    if (equal(tok, "case"))
+    {
+        if (!current_switch)
+        {
+            error_tok(tok, "stray case");
+        }
+        Node *node = new_node(ND_CASE, tok);
+        tok = tok->next;
+        long val = get_num(tok);
+        tok = skip(tok->next, ":");
+        node->label = new_unique_name();
+        node->lhs = stmt(&tok, tok);
+        node->val = val;
+        node->case_next = current_switch->case_next;
+        current_switch->case_next = node;
+
+        *rest = tok;
+        return node;
+    }
+
+    if (equal(tok, "default"))
+    {
+        if (!current_switch)
+        {
+            error_tok(tok, "stray default");
+        }
+        Node *node = new_node(ND_CASE, tok);
+        tok = skip(tok->next, ":");
+        node->label = new_unique_name();
+        node->lhs = stmt(rest, tok);
+        current_switch->default_case = node;
+        return node;
+    }
+
     if (equal(tok, "break"))
     {
         if (!brk_label)

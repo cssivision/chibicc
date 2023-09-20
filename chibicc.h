@@ -77,6 +77,8 @@ typedef enum
     ND_MEMBER,   // .
     ND_CAST,     // type cast
 
+    ND_SWITCH,    // switch
+    ND_CASE,      // case
     ND_GOTO,      // goto
     ND_LABEL,     // label
     ND_RETURN,    // return
@@ -136,9 +138,15 @@ struct Node
     Node *args;
     Type *func_ty;
 
-    int64_t val; // Used if kind == ND_NUM
+    // Switch-cases
+    Node *case_next;
+    Node *default_case;
 
-    Obj *var; // Used if kind == ND_VAR
+    // Variable
+    Obj *var;
+
+    // Numeric literal
+    int64_t val;
 
     Member *member;
 
