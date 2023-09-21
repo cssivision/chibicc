@@ -20,20 +20,21 @@ typedef struct
     bool is_static;
 } VarAttr;
 
-Node *new_add(Node *lhs, Node *rhs, Token *tok);
-Node *new_sub(Node *lhs, Node *rhs, Token *tok);
-Node *expr(Token **rest, Token *tok);
-Type *type_suffix(Token **rest, Token *tok, Type *ty);
-Type *typename(Token **rest, Token *tok);
-char *get_ident(Token *tok);
-long get_num(Token *tok);
-bool is_typename(Token *tok);
-Node *unary(Token **rest, Token *tok);
-Token *parse_typedef(Token *tok, Type *basety);
-Node *compound_stmt(Token **rest, Token *tok);
-Node *assign(Token **rest, Token *tok);
-Type *declarator(Token **rest, Token *tok, Type *ty);
-Type *declspec(Token **rest, Token *tok, VarAttr *attr);
+static Node *new_add(Node *lhs, Node *rhs, Token *tok);
+static Node *new_sub(Node *lhs, Node *rhs, Token *tok);
+static Node *expr(Token **rest, Token *tok);
+static Type *type_suffix(Token **rest, Token *tok, Type *ty);
+static Type *typename(Token **rest, Token *tok);
+static char *get_ident(Token *tok);
+static int64_t const_expr(Token **rest, Token *tok);
+static Node *conditional(Token **rest, Token *tok);
+static bool is_typename(Token *tok);
+static Node *unary(Token **rest, Token *tok);
+static Token *parse_typedef(Token *tok, Type *basety);
+static Node *compound_stmt(Token **rest, Token *tok);
+static Node *assign(Token **rest, Token *tok);
+static Type *declarator(Token **rest, Token *tok, Type *ty);
+static Type *declspec(Token **rest, Token *tok, VarAttr *attr);
 
 // Scope for local variables, global variables, typedefs
 // or enum constants
@@ -524,7 +525,7 @@ Node *cast(Token **rest, Token *tok)
 // unary = ("+" | "-" | "&" | "*" | "!" | "~") cast
 //       | ("++" | "--") unary
 //       | postfix
-Node *unary(Token **rest, Token *tok)
+static Node *unary(Token **rest, Token *tok)
 {
     if (equal(tok, "+"))
     {
@@ -621,7 +622,7 @@ Node *mul(Token **rest, Token *tok)
 // so that p+n points to the location n elements (not bytes) ahead of p.
 // In other words, we need to scale an integer value before adding to a
 // pointer value. This function takes care of the scaling.
-Node *new_add(Node *lhs, Node *rhs, Token *tok)
+static Node *new_add(Node *lhs, Node *rhs, Token *tok)
 {
     add_type(lhs);
     add_type(rhs);
@@ -651,7 +652,7 @@ Node *new_add(Node *lhs, Node *rhs, Token *tok)
 }
 
 // Like `+`, `-` is overloaded for the pointer type.
-Node *new_sub(Node *lhs, Node *rhs, Token *tok)
+static Node *new_sub(Node *lhs, Node *rhs, Token *tok)
 {
     add_type(lhs);
     add_type(rhs);
@@ -852,6 +853,82 @@ Node *logor(Token **rest, Token *tok)
     return node;
 }
 
+// Evaluate a given node as a constant expression.
+static int64_t eval(Node *node)
+{
+    add_type(node);
+
+    switch (node->kind)
+    {
+    case ND_ADD:
+        return eval(node->lhs) + eval(node->rhs);
+    case ND_SUB:
+        return eval(node->lhs) - eval(node->rhs);
+    case ND_MUL:
+        return eval(node->lhs) * eval(node->rhs);
+    case ND_DIV:
+        return eval(node->lhs) / eval(node->rhs);
+    case ND_NEG:
+        return -eval(node->lhs);
+    case ND_MOD:
+        return eval(node->lhs) % eval(node->rhs);
+    case ND_BITAND:
+        return eval(node->lhs) & eval(node->rhs);
+    case ND_BITOR:
+        return eval(node->lhs) | eval(node->rhs);
+    case ND_BITXOR:
+        return eval(node->lhs) ^ eval(node->rhs);
+    case ND_SHL:
+        return eval(node->lhs) << eval(node->rhs);
+    case ND_SHR:
+        return eval(node->lhs) >> eval(node->rhs);
+    case ND_EQ:
+        return eval(node->lhs) == eval(node->rhs);
+    case ND_NE:
+        return eval(node->lhs) != eval(node->rhs);
+    case ND_LT:
+        return eval(node->lhs) < eval(node->rhs);
+    case ND_LE:
+        return eval(node->lhs) <= eval(node->rhs);
+    case ND_COND:
+        return eval(node->cond) ? eval(node->then) : eval(node->els);
+    case ND_COMMA:
+        return eval(node->rhs);
+    case ND_NOT:
+        return !eval(node->lhs);
+    case ND_BITNOT:
+        return ~eval(node->lhs);
+    case ND_LOGAND:
+        return eval(node->lhs) && eval(node->rhs);
+    case ND_LOGOR:
+        return eval(node->lhs) || eval(node->rhs);
+    case ND_CAST:
+        if (is_integer(node->ty))
+        {
+            switch (node->ty->size)
+            {
+            case 1:
+                return (uint8_t)eval(node->lhs);
+            case 2:
+                return (uint16_t)eval(node->lhs);
+            case 4:
+                return (uint32_t)eval(node->lhs);
+            }
+        }
+        return eval(node->lhs);
+    case ND_NUM:
+        return node->val;
+    }
+
+    error_tok(node->tok, "not a compile-time constant");
+}
+
+static int64_t const_expr(Token **rest, Token *tok)
+{
+    Node *node = conditional(rest, tok);
+    return eval(node);
+}
+
 // conditional = logor ("?" expr ":" conditional)?
 Node *conditional(Token **rest, Token *tok)
 {
@@ -873,7 +950,7 @@ Node *conditional(Token **rest, Token *tok)
 
 // assign = conditional (assign-op assign)?
 // assign-op = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "|=" | "^=" | "&=" | "<<=" | ">>="
-Node *assign(Token **rest, Token *tok)
+static Node *assign(Token **rest, Token *tok)
 {
     Node *node = conditional(&tok, tok);
     if (equal(tok, "="))
@@ -1134,8 +1211,7 @@ Type *enum_specifier(Token **rest, Token *tok)
 
         if (equal(tok, "="))
         {
-            val = get_num(tok->next);
-            tok = tok->next->next;
+            val = const_expr(&tok, tok->next);
         }
         VarScope *vs = push_scope(name);
         vs->enum_ty = ty;
@@ -1165,7 +1241,7 @@ Type *enum_specifier(Token **rest, Token *tok)
 // while keeping the "current" type object that the typenames up
 // until that point represent. When we reach a non-typename token,
 // we returns the current type object.
-Type *declspec(Token **rest, Token *tok, VarAttr *attr)
+static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
 {
     // We use a single integer as counters for all typenames.
     // For example, bits 0 and 1 represents how many times we saw the
@@ -1334,15 +1410,6 @@ Type *func_params(Token **rest, Token *tok, Type *ty)
     return ty;
 }
 
-long get_num(Token *tok)
-{
-    if (tok->kind != TK_NUM)
-    {
-        error_tok(tok, "expected a number");
-    }
-    return tok->val;
-}
-
 // array-dimensions = num? "]" type-suffix
 Type *array_dimensions(Token **rest, Token *tok, Type *ty)
 {
@@ -1354,8 +1421,8 @@ Type *array_dimensions(Token **rest, Token *tok, Type *ty)
         return array_of(ty, -1);
     }
 
-    int len = get_num(tok);
-    tok = skip(tok->next, "]");
+    int len = const_expr(&tok, tok);
+    tok = skip(tok, "]");
     ty = type_suffix(&tok, tok, ty);
     *rest = tok;
     return array_of(ty, len);
@@ -1363,7 +1430,7 @@ Type *array_dimensions(Token **rest, Token *tok, Type *ty)
 
 // type-suffix = ("(" func-params? ")")?
 //               | "[" array-dimensions
-Type *type_suffix(Token **rest, Token *tok, Type *ty)
+static Type *type_suffix(Token **rest, Token *tok, Type *ty)
 {
     if (equal(tok, "("))
     {
@@ -1406,7 +1473,7 @@ static Type *abstract_declarator(Token **rest, Token *tok, Type *ty)
     return type_suffix(rest, tok, ty);
 }
 
-Type *typename(Token **rest, Token *tok)
+static Type *typename(Token **rest, Token *tok)
 {
     Type *basety = declspec(&tok, tok, NULL);
     Type *ty = abstract_declarator(&tok, tok, basety);
@@ -1415,7 +1482,7 @@ Type *typename(Token **rest, Token *tok)
 }
 
 // declarator = "*"* ("(" ident ")" | "(" declarator ")" | ident) type-suffix
-Type *declarator(Token **rest, Token *tok, Type *ty)
+static Type *declarator(Token **rest, Token *tok, Type *ty)
 {
     while (consume(&tok, tok, "*"))
     {
@@ -1443,7 +1510,7 @@ Type *declarator(Token **rest, Token *tok, Type *ty)
     return ty;
 }
 
-char *get_ident(Token *tok)
+static char *get_ident(Token *tok)
 {
     if (tok->kind != TK_IDENT)
     {
@@ -1535,8 +1602,8 @@ static Node *stmt(Token **rest, Token *tok)
         }
         Node *node = new_node(ND_CASE, tok);
         tok = tok->next;
-        long val = get_num(tok);
-        tok = skip(tok->next, ":");
+        long val = const_expr(&tok, tok);
+        tok = skip(tok, ":");
         node->label = new_unique_name();
         node->lhs = stmt(&tok, tok);
         node->val = val;
@@ -1697,7 +1764,7 @@ static Node *stmt(Token **rest, Token *tok)
     return expr_stmt(rest, tok);
 }
 
-bool is_typename(Token *tok)
+static bool is_typename(Token *tok)
 {
     static char *kw[] = {
         "void",
@@ -1724,7 +1791,7 @@ bool is_typename(Token *tok)
 }
 
 // compound_stmt = (typedef | declaration | stmt)* "}"
-Node *compound_stmt(Token **rest, Token *tok)
+static Node *compound_stmt(Token **rest, Token *tok)
 {
     Node *node = new_node(ND_BLOCK, tok);
     Node head = {};
@@ -1847,7 +1914,7 @@ Token *global_variable(Token *tok, Type *basety)
 }
 
 // typedef = (declarator ("," declarator)*)*
-Token *parse_typedef(Token *tok, Type *basety)
+static Token *parse_typedef(Token *tok, Type *basety)
 {
     int i = 0;
     while (!consume(&tok, tok, ";"))
