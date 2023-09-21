@@ -72,6 +72,7 @@ typedef enum
     ND_BITAND,   // &
     ND_LOGAND,   // &&
     ND_LOGOR,    // ||
+    ND_COND,     // "?:"
     ND_NUM,      // Integer
     ND_VAR,      // Variable
     ND_FUNCCALL, // Function call

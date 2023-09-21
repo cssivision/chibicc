@@ -273,6 +273,19 @@ void gen_expr(Node *node)
         gen_expr(node->lhs);
         println("  neg %%rax");
         return;
+    case ND_COND:
+    {
+        int c = count();
+        gen_expr(node->cond);
+        println("  cmp $0, %%rax");
+        println("  je .L.else.%d", c);
+        gen_expr(node->then);
+        println("  jmp .L.end.%d", c);
+        println(".L.else.%d:", c);
+        gen_expr(node->els);
+        println(".L.end.%d:", c);
+        return;
+    }
     case ND_ASSIGN:
         gen_addr(node->lhs);
         push();

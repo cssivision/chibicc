@@ -852,11 +852,30 @@ Node *logor(Token **rest, Token *tok)
     return node;
 }
 
-// assign = bitor (assign-op assign)?
+// conditional = logor ("?" expr ":" conditional)?
+Node *conditional(Token **rest, Token *tok)
+{
+    Node *cond = logor(&tok, tok);
+    if (!equal(tok, "?"))
+    {
+        *rest = tok;
+        return cond;
+    }
+
+    Node *node = new_node(ND_COND, tok);
+    node->cond = cond;
+    node->then = expr(&tok, tok->next);
+    tok = skip(tok, ":");
+    node->els = conditional(&tok, tok);
+    *rest = tok;
+    return node;
+}
+
+// assign = conditional (assign-op assign)?
 // assign-op = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "|=" | "^=" | "&=" | "<<=" | ">>="
 Node *assign(Token **rest, Token *tok)
 {
-    Node *node = logor(&tok, tok);
+    Node *node = conditional(&tok, tok);
     if (equal(tok, "="))
     {
         Node *rhs = assign(&tok, tok->next);

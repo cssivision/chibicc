@@ -173,6 +173,15 @@ void add_type(Node *node)
     case ND_VAR:
         node->ty = node->var->ty;
         return;
+    case ND_COND:
+        if (node->then->ty->kind == TY_VOID || node->then->ty->kind == TY_VOID)
+        {
+            node->ty = ty_void;
+            return;
+        }
+        usual_arith_conv(&node->then, &node->els);
+        node->ty = node->then->ty;
+        return;
     case ND_ADDR:
     {
         if (node->lhs->ty->kind == TY_ARRAY)
