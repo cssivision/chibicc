@@ -708,35 +708,52 @@ Node *add(Token **rest, Token *tok)
     }
 }
 
-// relational = add ("<" add | "<=" add | ">" add | ">=" add)*
-Node *relational(Token **rest, Token *tok)
+// shift = add (">>" | "<<") bitshift
+Node *shift(Token **rest, Token *tok)
 {
     Node *node = add(&tok, tok);
+    if (equal(tok, ">>"))
+    {
+        node = new_binary(ND_SHR, node, shift(&tok, tok->next), tok);
+    }
+
+    if (equal(tok, "<<"))
+    {
+        node = new_binary(ND_SHL, node, shift(&tok, tok->next), tok);
+    }
+    *rest = tok;
+    return node;
+}
+
+// relational = shift ("<" shift | "<=" shift | ">" shift | ">=" shift)*
+Node *relational(Token **rest, Token *tok)
+{
+    Node *node = shift(&tok, tok);
 
     for (;;)
     {
         Token *start = tok;
         if (equal(tok, "<"))
         {
-            node = new_binary(ND_LT, node, add(&tok, tok->next), tok);
+            node = new_binary(ND_LT, node, shift(&tok, tok->next), tok);
             continue;
         }
 
         if (equal(tok, "<="))
         {
-            node = new_binary(ND_LE, node, add(&tok, tok->next), tok);
+            node = new_binary(ND_LE, node, shift(&tok, tok->next), tok);
             continue;
         }
 
         if (equal(tok, ">"))
         {
-            node = new_binary(ND_LT, add(&tok, tok->next), node, tok);
+            node = new_binary(ND_LT, shift(&tok, tok->next), node, tok);
             continue;
         }
 
         if (equal(tok, ">="))
         {
-            node = new_binary(ND_LE, add(&tok, tok->next), node, tok);
+            node = new_binary(ND_LE, shift(&tok, tok->next), node, tok);
             continue;
         }
 
@@ -836,7 +853,7 @@ Node *logor(Token **rest, Token *tok)
 }
 
 // assign = bitor (assign-op assign)?
-// assign-op = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "|=" | "^=" | "&="
+// assign-op = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "|=" | "^=" | "&=" | "<<=" | ">>="
 Node *assign(Token **rest, Token *tok)
 {
     Node *node = logor(&tok, tok);
@@ -884,6 +901,17 @@ Node *assign(Token **rest, Token *tok)
     {
         node = to_assign(new_binary(ND_BITXOR, node, assign(&tok, tok->next), tok));
     }
+
+    if (equal(tok, "<<="))
+    {
+        node = to_assign(new_binary(ND_SHL, node, assign(&tok, tok->next), tok));
+    }
+
+    if (equal(tok, ">>="))
+    {
+        node = to_assign(new_binary(ND_SHR, node, assign(&tok, tok->next), tok));
+    }
+
     *rest = tok;
     return node;
 }

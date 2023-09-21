@@ -100,6 +100,10 @@ int read_punct(char *p)
         "^=",
         "||",
         "&&",
+        "<<=",
+        ">>=",
+        "<<",
+        ">>",
     };
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
