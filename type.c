@@ -53,6 +53,7 @@ Type *array_of(Type *base, int len)
 {
     Type *ty = new_type(TY_ARRAY, base->size * len, base->align);
     ty->base = base;
+    ty->array_len = len;
     return ty;
 }
 

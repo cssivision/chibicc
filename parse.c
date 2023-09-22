@@ -22,6 +22,7 @@ typedef struct
 
 static Node *new_add(Node *lhs, Node *rhs, Token *tok);
 static Node *new_sub(Node *lhs, Node *rhs, Token *tok);
+static Node *new_node(NodeKind kind, Token *tok);
 static Node *expr(Token **rest, Token *tok);
 static Type *type_suffix(Token **rest, Token *tok, Type *ty);
 static Type *typename(Token **rest, Token *tok);
@@ -124,7 +125,7 @@ bool equal(Token *tok, char *p)
     return memcmp(tok->loc, p, tok->len) == 0 && p[tok->len] == '\0';
 }
 
-Node *new_node(NodeKind kind, Token *tok)
+static Node *new_node(NodeKind kind, Token *tok)
 {
     Node *node = calloc(1, sizeof(Node));
     node->kind = kind;
@@ -1519,6 +1520,122 @@ static char *get_ident(Token *tok)
     return strndup(tok->loc, tok->len);
 }
 
+// This struct represents a variable initializer. Since initializers
+// can be nested (e.g. `int x[2][2] = {{1, 2}, {3, 4}}`), this struct
+// is a tree data structure.
+typedef struct Initializer Initializer;
+struct Initializer
+{
+    Initializer *next;
+    Type *ty;
+    Obj *var;
+    int idx;
+
+    // If it's not an aggregate type and has an initializer,
+    // `expr` has an initialization expression.
+    Node *expr;
+
+    // If it's an initializer for an aggregate type (e.g. array or struct),
+    // `children` has initializers for its children.
+    Initializer **children;
+};
+
+static Initializer *new_initializer(Type *ty)
+{
+    Initializer *init = calloc(1, sizeof(Initializer));
+    init->ty = ty;
+
+    if (ty->kind == TY_ARRAY)
+    {
+        init->children = calloc(ty->array_len, sizeof(Initializer *));
+        for (int i = 0; i < ty->array_len; i++)
+        {
+            Initializer *init2 = new_initializer(ty->base);
+            init2->idx = i;
+            init2->next = init;
+            init->children[i] = init2;
+        }
+    }
+    return init;
+}
+
+static void initializer2(Token **rest, Token *tok, Initializer *init)
+{
+    if (init->ty->kind == TY_ARRAY)
+    {
+        tok = skip(tok, "{");
+        for (int i = 0; i < init->ty->array_len; i++)
+        {
+            if (i > 0)
+            {
+                tok = skip(tok, ",");
+            }
+            initializer2(&tok, tok, init->children[i]);
+        }
+        *rest = skip(tok, "}");
+        return;
+    }
+    init->expr = assign(&tok, tok);
+    *rest = tok;
+    return;
+}
+
+// initializer = "{" initializer ("," initializer)* "}"
+//              | assign
+static Initializer *initializer(Token **rest, Token *tok, Type *ty)
+{
+    Initializer *init = new_initializer(ty);
+    initializer2(&tok, tok, init);
+    *rest = tok;
+    return init;
+}
+
+static Node *init_desg_expr(Initializer *init, Token *tok)
+{
+    if (init->var)
+    {
+        return new_var_node(init->var, tok);
+    }
+    Node *lhs = init_desg_expr(init->next, tok);
+    Node *rhs = new_num(init->idx, tok);
+    return new_unary(ND_DEREF, new_add(lhs, rhs, tok), tok);
+}
+
+static Node *create_lvar_init(Initializer *init, Token *tok)
+{
+    if (init->ty->kind == TY_ARRAY)
+    {
+        Node *node = new_node(ND_NULL_EXPR, tok);
+        for (int i = 0; i < init->ty->array_len; i++)
+        {
+            Node *rhs = create_lvar_init(init->children[i], tok);
+            node = new_binary(ND_COMMA, node, rhs, tok);
+        }
+        return node;
+    }
+
+    Node *lhs = init_desg_expr(init, tok);
+    return new_binary(ND_ASSIGN, lhs, init->expr, tok);
+}
+
+// A variable definition with an initializer is a shorthand notation
+// for a variable definition followed by assignments. This function
+// generates assignment expressions for an initializer. For example,
+// `int x[2][2] = {{6, 7}, {8, 9}}` is converted to the following
+// expressions:
+//
+//   x[0][0] = 6;
+//   x[0][1] = 7;
+//   x[1][0] = 8;
+//   x[1][1] = 9;
+Node *lvar_initializer(Token **rest, Token *tok, Obj *var)
+{
+    Initializer *init = initializer(&tok, tok, var->ty);
+    init->var = var;
+    *rest = tok;
+    return create_lvar_init(init, tok);
+}
+
 // declaration = (declarator ("=" assign)? (",", declarator ("=" assign)?)*)? ";"
 Node *declaration(Token **rest, Token *tok, Type *basety)
 {
@@ -1548,10 +1665,7 @@ Node *declaration(Token **rest, Token *tok, Type *basety)
         {
             continue;
         }
-
-        Node *lhs = new_var_node(var, ty->name);
-        Node *rhs = assign(&tok, tok->next);
-        Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
+        Node *node = lvar_initializer(&tok, tok->next, var);
         cur = cur->next = new_unary(ND_EXPR_STMT, node, tok);
     }
     Node *node = new_node(ND_BLOCK, tok);

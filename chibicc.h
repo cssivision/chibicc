@@ -89,7 +89,8 @@ typedef enum
     ND_IF,        // if
     ND_FOR,       // for or while
     ND_EXPR_STMT, // Expression statement
-    ND_STMT_EXPR
+    ND_STMT_EXPR,
+    ND_NULL_EXPR
 } NodeKind;
 
 // Variable or function
