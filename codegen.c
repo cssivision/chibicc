@@ -214,6 +214,13 @@ void gen_expr(Node *node)
     {
     case ND_NULL_EXPR:
         return;
+    case ND_MEMZERO:
+        // `rep stosb` is equivalent to `memset(%rdi, %al, %rcx)`.
+        println("  mov $%d, %%rcx", node->var->ty->size);
+        println("  lea %d(%%rbp), %%rdi", node->var->offset);
+        println("  mov $0, %%al");
+        println("  rep stosb");
+        return;
     case ND_NUM:
         println("  mov $%ld, %%rax", node->val);
         return;

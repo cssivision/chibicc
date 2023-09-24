@@ -79,6 +79,7 @@ typedef enum
     ND_COMMA,    // ,
     ND_MEMBER,   // .
     ND_CAST,     // type cast
+    ND_MEMZERO,  // Zero-clear a stack variable
 
     ND_SWITCH,    // switch
     ND_CASE,      // case

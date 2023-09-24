@@ -133,7 +133,7 @@ static Node *new_node(NodeKind kind, Token *tok)
     return node;
 }
 
-Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *tok)
+static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *tok)
 {
     Node *node = new_node(kind, tok);
     node->lhs = lhs;
@@ -141,7 +141,7 @@ Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *tok)
     return node;
 }
 
-Node *new_unary(NodeKind kind, Node *expr, Token *tok)
+static Node *new_unary(NodeKind kind, Node *expr, Token *tok)
 {
     Node *node = new_node(kind, tok);
     node->lhs = expr;
@@ -1564,7 +1564,7 @@ static void initializer2(Token **rest, Token *tok, Initializer *init)
     if (init->ty->kind == TY_ARRAY)
     {
         tok = skip(tok, "{");
-        for (int i = 0; i < init->ty->array_len; i++)
+        for (int i = 0; i < init->ty->array_len && !equal(tok, "}"); i++)
         {
             if (i > 0)
             {
@@ -1614,6 +1614,11 @@ static Node *create_lvar_init(Initializer *init, Token *tok)
         return node;
     }
 
+    if (!init->expr)
+    {
+        return new_node(ND_NULL_EXPR, tok);
+    }
+
     Node *lhs = init_desg_expr(init, tok);
     return new_binary(ND_ASSIGN, lhs, init->expr, tok);
 }
@@ -1632,8 +1637,16 @@ Node *lvar_initializer(Token **rest, Token *tok, Obj *var)
 {
     Initializer *init = initializer(&tok, tok, var->ty);
     init->var = var;
+
+    // If a partial initializer list is given, the standard requires
+    // that unspecified elements are set to 0. Here, we simply
+    // zero-initialize the entire memory region of a variable before
+    // initializing it with user-supplied values.
+    Node *lhs = new_node(ND_MEMZERO, tok);
+    lhs->var = var;
+
     *rest = tok;
-    return create_lvar_init(init, tok);
+    return new_binary(ND_COMMA, lhs, create_lvar_init(init, tok), tok);
 }
 
 // declaration = (declarator ("=" assign)? (",", declarator ("=" assign)?)*)? ";"
