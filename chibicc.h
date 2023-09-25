@@ -48,6 +48,7 @@ struct Member
     Token *tok;
     Type *ty;
     Token *name;
+    int idx;
     int offset;
 };
 
