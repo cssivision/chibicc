@@ -10,6 +10,9 @@
 #include "stdbool.h"
 #include "assert.h"
 
+#define MAX(x, y) ((x) < (y) ? (y) : (x))
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
+
 typedef struct Type Type;
 typedef struct Token Token;
 typedef struct Obj Obj;
