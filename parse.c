@@ -28,6 +28,7 @@ struct Initializer
 {
     Initializer *next;
     Type *ty;
+    bool is_flexible;
     Obj *var;
     int idx;
 
@@ -1541,17 +1542,23 @@ static char *get_ident(Token *tok)
     return strndup(tok->loc, tok->len);
 }
 
-static Initializer *new_initializer(Type *ty)
+static Initializer *new_initializer(Type *ty, Obj *var, bool is_flexible)
 {
     Initializer *init = calloc(1, sizeof(Initializer));
     init->ty = ty;
+    init->var = var;
 
     if (ty->kind == TY_ARRAY)
     {
+        if (is_flexible && ty->size < 0)
+        {
+            init->is_flexible = true;
+            return init;
+        }
         init->children = calloc(ty->array_len, sizeof(Initializer *));
         for (int i = 0; i < ty->array_len; i++)
         {
-            Initializer *init2 = new_initializer(ty->base);
+            Initializer *init2 = new_initializer(ty->base, NULL, false);
             init2->idx = i;
             init2->next = init;
             init->children[i] = init2;
@@ -1571,9 +1578,30 @@ static Token *skip_excess_element(Token *tok)
     return tok;
 }
 
+static int count_array_init_elements(Token *tok, Type *ty)
+{
+    Initializer *dummy = new_initializer(ty->base, NULL, false);
+    int i = 0;
+
+    for (; !equal(tok, "}"); i++)
+    {
+        if (i > 0)
+            tok = skip(tok, ",");
+        initializer2(&tok, tok, dummy);
+    }
+    return i;
+}
+
 static void array_initializer(Token **rest, Token *tok, Initializer *init)
 {
     tok = skip(tok, "{");
+
+    if (init->is_flexible)
+    {
+        int len = count_array_init_elements(tok, init->ty);
+        *init = *new_initializer(array_of(init->ty->base, len), init->var, false);
+    }
+
     for (int i = 0; !consume(rest, tok, "}"); i++)
     {
         if (i > 0)
@@ -1594,6 +1622,11 @@ static void array_initializer(Token **rest, Token *tok, Initializer *init)
 
 static void string_initializer(Token **rest, Token *tok, Initializer *init)
 {
+    if (init->is_flexible)
+    {
+        *init = *new_initializer(array_of(init->ty->base, tok->ty->array_len), init->var, false);
+    }
+
     int len = MIN(init->ty->array_len, tok->ty->array_len);
     for (int i = 0; i < len; i++)
     {
@@ -1605,7 +1638,6 @@ static void string_initializer(Token **rest, Token *tok, Initializer *init)
 
 void initializer2(Token **rest, Token *tok, Initializer *init)
 {
-
     if (init->ty->kind == TY_ARRAY && tok->kind == TK_STR)
     {
         string_initializer(rest, tok, init);
@@ -1624,11 +1656,12 @@ void initializer2(Token **rest, Token *tok, Initializer *init)
 
 // initializer = "{" initializer ("," initializer)* "}"
 //              | assign
-static Initializer *initializer(Token **rest, Token *tok, Type *ty)
+static Initializer *initializer(Token **rest, Token *tok, Obj *var)
 {
-    Initializer *init = new_initializer(ty);
+    Initializer *init = new_initializer(var->ty, var, true);
     initializer2(&tok, tok, init);
     *rest = tok;
+    var->ty = init->ty;
     return init;
 }
 
@@ -1677,8 +1710,7 @@ static Node *create_lvar_init(Initializer *init, Token *tok)
 //   x[1][1] = 9;
 static Node *lvar_initializer(Token **rest, Token *tok, Obj *var)
 {
-    Initializer *init = initializer(&tok, tok, var->ty);
-    init->var = var;
+    Initializer *init = initializer(&tok, tok, var);
 
     // If a partial initializer list is given, the standard requires
     // that unspecified elements are set to 0. Here, we simply
@@ -1706,10 +1738,6 @@ static Node *declaration(Token **rest, Token *tok, Type *basety)
         }
 
         Type *ty = declarator(&tok, tok, basety);
-        if (ty->size < 0)
-        {
-            error_tok(tok, "variable has incomplete type");
-        }
         if (ty->kind == TY_VOID)
         {
             error_tok(tok, "variable declared void");
@@ -1721,6 +1749,14 @@ static Node *declaration(Token **rest, Token *tok, Type *basety)
             continue;
         }
         Node *node = lvar_initializer(&tok, tok->next, var);
+        if (var->ty->size < 0)
+        {
+            error_tok(ty->name, "variable has incomplete type");
+        }
+        if (var->ty->kind == TY_VOID)
+        {
+            error_tok(ty->name, "variable declared void");
+        }
         cur = cur->next = new_unary(ND_EXPR_STMT, node, tok);
     }
     Node *node = new_node(ND_BLOCK, tok);
