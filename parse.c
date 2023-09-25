@@ -1704,6 +1704,19 @@ void initializer2(Token **rest, Token *tok, Initializer *init)
 
     if (init->ty->kind == TY_STRUCT)
     {
+        // A struct can be initialized with another struct. E.g.
+        // `struct T x = y;` where y is a variable of type `struct T`.
+        // Handle that case first.
+        if (!equal(tok, "{"))
+        {
+            Node *expr = assign(rest, tok);
+            add_type(expr);
+            if (expr->ty->kind == TY_STRUCT)
+            {
+                init->expr = expr;
+                return;
+            }
+        }
         struct_initializer(rest, tok, init);
         return;
     }
@@ -1754,7 +1767,7 @@ static Node *create_lvar_init(Initializer *init, Token *tok)
         return node;
     }
 
-    if (init->ty->kind == TY_STRUCT)
+    if (init->ty->kind == TY_STRUCT && !init->expr)
     {
         Node *node = new_node(ND_NULL_EXPR, tok);
         for (Member *mem = init->ty->members; mem; mem = mem->next)
