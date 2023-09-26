@@ -52,6 +52,8 @@ static char *get_ident(Token *tok);
 static int64_t const_expr(Token **rest, Token *tok);
 static Node *conditional(Token **rest, Token *tok);
 void initializer2(Token **rest, Token *tok, Initializer *init);
+static int64_t eval2(Node *node, char **label);
+static int64_t eval_rval(Node *node, char **label);
 static bool is_typename(Token *tok);
 static Node *unary(Token **rest, Token *tok);
 static Token *parse_typedef(Token *tok, Type *basety);
@@ -880,14 +882,25 @@ static Node *logor(Token **rest, Token *tok)
 // Evaluate a given node as a constant expression.
 static int64_t eval(Node *node)
 {
+    return eval2(node, NULL);
+}
+
+// Evaluate a given node as a constant expression.
+//
+// A constant expression is either just a number or ptr+n where ptr
+// is a pointer to a global variable and n is a postiive/negative
+// number. The latter form is accepted only as an initialization
+// expression for a global variable.
+static int64_t eval2(Node *node, char **label)
+{
     add_type(node);
 
     switch (node->kind)
     {
     case ND_ADD:
-        return eval(node->lhs) + eval(node->rhs);
+        return eval2(node->lhs, label) + eval(node->rhs);
     case ND_SUB:
-        return eval(node->lhs) - eval(node->rhs);
+        return eval2(node->lhs, label) - eval(node->rhs);
     case ND_MUL:
         return eval(node->lhs) * eval(node->rhs);
     case ND_DIV:
@@ -915,9 +928,9 @@ static int64_t eval(Node *node)
     case ND_LE:
         return eval(node->lhs) <= eval(node->rhs);
     case ND_COND:
-        return eval(node->cond) ? eval(node->then) : eval(node->els);
+        return eval(node->cond) ? eval2(node->then, label) : eval2(node->els, label);
     case ND_COMMA:
-        return eval(node->rhs);
+        return eval2(node->rhs, label);
     case ND_NOT:
         return !eval(node->lhs);
     case ND_BITNOT:
@@ -927,24 +940,78 @@ static int64_t eval(Node *node)
     case ND_LOGOR:
         return eval(node->lhs) || eval(node->rhs);
     case ND_CAST:
+    {
+        int64_t val = eval2(node->lhs, label);
         if (is_integer(node->ty))
         {
             switch (node->ty->size)
             {
             case 1:
-                return (uint8_t)eval(node->lhs);
+                return (uint8_t)val;
             case 2:
-                return (uint16_t)eval(node->lhs);
+                return (uint16_t)val;
             case 4:
-                return (uint32_t)eval(node->lhs);
+                return (uint32_t)val;
             }
         }
-        return eval(node->lhs);
+        return val;
+    }
+    case ND_ADDR:
+    {
+        return eval_rval(node->lhs, label);
+    }
+    case ND_MEMBER:
+    {
+        if (!label)
+        {
+            error_tok(node->tok, "not a compile-time constant");
+        }
+        if (node->ty->kind != TY_ARRAY)
+        {
+            error_tok(node->tok, "invalid initializer");
+        }
+        return eval_rval(node->lhs, label) + node->member->offset;
+    }
+    case ND_VAR:
+        if (!label)
+        {
+            error_tok(node->tok, "not a compile-time constant");
+        }
+        if (node->var->ty->kind != TY_ARRAY && node->var->ty->kind != TY_FUNC)
+        {
+            error_tok(node->tok, "invalid initializer");
+        }
+        *label = node->var->name;
+        return 0;
     case ND_NUM:
         return node->val;
     }
-
     error_tok(node->tok, "not a compile-time constant");
+}
+
+static int64_t eval_rval(Node *node, char **label)
+{
+    switch (node->kind)
+    {
+    case ND_VAR:
+    {
+        if (node->var->is_local)
+        {
+            error_tok(node->tok, "not a compile-time constant");
+        }
+        *label = node->var->name;
+        return 0;
+    }
+    case ND_DEREF:
+    {
+        return eval2(node->lhs, label);
+    }
+    case ND_MEMBER:
+    {
+        return eval_rval(node->lhs, label) + node->member->offset;
+    }
+    }
+    error_tok(node->tok, "invalid initializer");
 }
 
 static int64_t const_expr(Token **rest, Token *tok)
@@ -2212,6 +2279,89 @@ static bool is_function(Token *tok)
     return ty->kind == TY_FUNC;
 }
 
+static void write_buf(char *buf, uint64_t val, int sz)
+{
+    if (sz == 1)
+    {
+        *buf = val;
+    }
+    else if (sz == 2)
+    {
+        *(uint16_t *)buf = val;
+    }
+    else if (sz == 4)
+    {
+        *(uint32_t *)buf = val;
+    }
+    else if (sz == 8)
+    {
+        *(uint64_t *)buf = val;
+    }
+    else
+    {
+        unreachable();
+    }
+}
+
+static Relocation *write_gvar_data(Relocation *cur, Initializer *init, char *buf, int offset)
+{
+    if (init->ty->kind == TY_ARRAY)
+    {
+        int sz = init->ty->base->size;
+        for (int i = 0; i < init->ty->array_len; i++)
+        {
+            cur = write_gvar_data(cur, init->children[i], buf, offset + sz * i);
+        }
+        return cur;
+    }
+
+    if (init->ty->kind == TY_STRUCT)
+    {
+        for (Member *mem = init->ty->members; mem; mem = mem->next)
+        {
+            cur = write_gvar_data(cur, init->children[mem->idx], buf, offset + mem->offset);
+        }
+        return cur;
+    }
+
+    if (init->ty->kind == TY_UNION)
+    {
+        cur = write_gvar_data(cur, init->children[0], buf, offset);
+        return cur;
+    }
+
+    if (!init->expr)
+    {
+        return cur;
+    }
+
+    char *label = NULL;
+    uint64_t val = eval2(init->expr, &label);
+
+    if (!label)
+    {
+        write_buf(buf + offset, val, init->ty->size);
+        return cur;
+    }
+
+    Relocation *rel = calloc(1, sizeof(Relocation));
+    rel->offset = offset;
+    rel->label = label;
+    rel->addend = val;
+    cur->next = rel;
+    return cur->next;
+}
+
+static void gvar_initializer(Token **rest, Token *tok, Obj *var)
+{
+    Initializer *init = initializer(rest, tok, var);
+    Relocation head = {};
+    char *buf = calloc(1, var->ty->size);
+    write_gvar_data(&head, init, buf, 0);
+    var->init_data = buf;
+    var->rel = head.next;
+}
+
 static Token *global_variable(Token *tok, Type *basety)
 {
     int i = 0;
@@ -2222,7 +2372,11 @@ static Token *global_variable(Token *tok, Type *basety)
             tok = skip(tok, ",");
         }
         Type *ty = declarator(&tok, tok, basety);
-        new_gvar(get_ident(ty->name), ty);
+        Obj *var = new_gvar(get_ident(ty->name), ty);
+        if (equal(tok, "="))
+        {
+            gvar_initializer(&tok, tok->next, var);
+        }
     }
     tok = skip(tok, ";");
     return tok;
