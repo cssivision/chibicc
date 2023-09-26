@@ -1570,7 +1570,7 @@ static Initializer *new_initializer(Type *ty, Obj *var, bool is_flexible)
         return init;
     }
 
-    if (ty->kind == TY_STRUCT)
+    if (ty->kind == TY_STRUCT || ty->kind == TY_UNION)
     {
         int len = 0;
         for (Member *mem = ty->members; mem; mem = mem->next)
@@ -1625,7 +1625,9 @@ static void array_initializer(Token **rest, Token *tok, Initializer *init)
     if (init->is_flexible)
     {
         int len = count_array_init_elements(tok, init->ty);
-        *init = *new_initializer(array_of(init->ty->base, len), init->var, false);
+        Type *ty = array_of(init->ty->base, len);
+        init->var->ty = ty;
+        *init = *new_initializer(ty, init->var, false);
     }
 
     for (int i = 0; !consume(rest, tok, "}"); i++)
@@ -1650,7 +1652,9 @@ static void string_initializer(Token **rest, Token *tok, Initializer *init)
 {
     if (init->is_flexible)
     {
-        *init = *new_initializer(array_of(init->ty->base, tok->ty->array_len), init->var, false);
+        Type *ty = array_of(init->ty->base, tok->ty->array_len);
+        init->var->ty = ty;
+        *init = *new_initializer(ty, init->var, false);
     }
 
     int len = MIN(init->ty->array_len, tok->ty->array_len);
@@ -1688,6 +1692,13 @@ static void struct_initializer(Token **rest, Token *tok, Initializer *init)
     return;
 }
 
+static void union_initializer(Token **rest, Token *tok, Initializer *init)
+{
+    tok = skip(tok, "{");
+    initializer2(&tok, tok, init->children[0]);
+    *rest = skip(tok, "}");
+}
+
 void initializer2(Token **rest, Token *tok, Initializer *init)
 {
     if (init->ty->kind == TY_ARRAY && tok->kind == TK_STR)
@@ -1721,6 +1732,12 @@ void initializer2(Token **rest, Token *tok, Initializer *init)
         return;
     }
 
+    if (init->ty->kind == TY_UNION)
+    {
+        union_initializer(rest, tok, init);
+        return;
+    }
+
     init->expr = assign(&tok, tok);
     *rest = tok;
     return;
@@ -1733,7 +1750,6 @@ static Initializer *initializer(Token **rest, Token *tok, Obj *var)
     Initializer *init = new_initializer(var->ty, var, true);
     initializer2(&tok, tok, init);
     *rest = tok;
-    var->ty = init->ty;
     return init;
 }
 
@@ -1776,6 +1792,11 @@ static Node *create_lvar_init(Initializer *init, Token *tok)
             node = new_binary(ND_COMMA, node, rhs, tok);
         }
         return node;
+    }
+
+    if (init->ty->kind == TY_UNION)
+    {
+        return create_lvar_init(init->children[0], tok);
     }
 
     if (!init->expr)
