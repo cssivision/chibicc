@@ -56,6 +56,9 @@ void initializer2(Token **rest, Token *tok, Initializer *init);
 static int64_t eval2(Node *node, char **label);
 static int64_t eval_rval(Node *node, char **label);
 static bool is_typename(Token *tok);
+static bool is_function(Token *tok);
+static Token *function(Token *tok, Type *basety, VarAttr *attr);
+static Token *global_variable(Token *tok, Type *basety, VarAttr *attr);
 static Node *unary(Token **rest, Token *tok);
 static Token *parse_typedef(Token *tok, Type *basety);
 static Node *compound_stmt(Token **rest, Token *tok);
@@ -2302,6 +2305,19 @@ static Node *compound_stmt(Token **rest, Token *tok)
                 tok = parse_typedef(tok, basety);
                 continue;
             }
+
+            if (is_function(tok))
+            {
+                tok = function(tok, basety, &attr);
+                continue;
+            }
+
+            if (attr.is_extern)
+            {
+                tok = global_variable(tok, basety, &attr);
+                continue;
+            }
+
             cur = cur->next = declaration(&tok, tok, basety);
         }
         else
@@ -2352,7 +2368,7 @@ static void resolve_goto_labels(void)
 }
 
 // function = declspec declarator "{" compound_stmt
-Token *function(Token *tok, Type *basety, VarAttr *attr)
+static Token *function(Token *tok, Type *basety, VarAttr *attr)
 {
     Type *ty = declarator(&tok, tok, basety);
 
