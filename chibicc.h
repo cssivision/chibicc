@@ -50,6 +50,7 @@ struct Member
     Token *name;
     int idx;
     int offset;
+    int align;
 };
 
 typedef enum
@@ -118,6 +119,8 @@ struct Obj
     Type *ty;
     int offset;    // Offset from RBP
     bool is_local; // local or global/function
+    int align;     // alignment
+
     Node *body;
     // Function params
     Obj *params;

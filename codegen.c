@@ -548,7 +548,7 @@ void assign_lvar_offsets(Obj *prog)
         for (Obj *var = fn->locals; var; var = var->next)
         {
             offset += var->ty->size;
-            offset = align_to(offset, var->ty->align);
+            offset = align_to(offset, var->align);
             var->offset = -offset;
         }
         fn->stack_size = align_to(offset, 16);
@@ -564,7 +564,7 @@ void emit_data(Obj *prog)
             continue;
         }
         println("  .globl %s", var->name);
-        println("  .align %d", var->ty->align);
+        println("  .align %d", var->align);
         if (var->init_data)
         {
             println("  .data");

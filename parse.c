@@ -19,6 +19,7 @@ typedef struct
     bool is_typedef;
     bool is_static;
     bool is_extern;
+    int align;
 } VarAttr;
 
 // This struct represents a variable initializer. Since initializers
@@ -242,6 +243,7 @@ static Obj *new_var(char *name, Type *ty)
     Obj *var = calloc(1, sizeof(Obj));
     var->name = name;
     var->ty = ty;
+    var->align = ty->align;
     push_scope(name)->var = var;
     return var;
 }
@@ -336,6 +338,7 @@ static Obj *new_string_literal(char *str, Type *ty)
 //          | ident func-args?
 //          | num
 //          | sizeof unary
+//          | "_Alignof" "(" type-name ")"
 //          | sizeof "(" type-name ")"
 //          | str
 static Node *primary(Token **rest, Token *tok)
@@ -374,6 +377,14 @@ static Node *primary(Token **rest, Token *tok)
         add_type(node);
         *rest = tok;
         return new_num(node->ty->size, tok);
+    }
+
+    if (equal(tok, "_Alignof"))
+    {
+        tok = skip(tok->next, "(");
+        Type *ty = typename(&tok, tok);
+        *rest = skip(tok, ")");
+        return new_num(ty->align, tok);
     }
 
     if (tok->kind == TK_STR)
@@ -1145,7 +1156,8 @@ static void struct_members(Token **rest, Token *tok, Type *ty)
     while (!equal(tok, "}"))
     {
         bool first = true;
-        Type *basety = declspec(&tok, tok, NULL);
+        VarAttr attr = {};
+        Type *basety = declspec(&tok, tok, &attr);
         while (!equal(tok, ";"))
         {
             if (!first)
@@ -1158,6 +1170,7 @@ static void struct_members(Token **rest, Token *tok, Type *ty)
             mem->ty = ty;
             mem->name = ty->name;
             mem->idx = idx++;
+            mem->align = attr.align ? attr.align : mem->ty->align;
             cur = cur->next = mem;
         }
         tok = skip(tok, ";");
@@ -1239,12 +1252,12 @@ static Type *struct_decl(Token **rest, Token *tok)
     int offset = 0;
     for (Member *mem = ty->members; mem; mem = mem->next)
     {
-        offset = align_to(offset, mem->ty->align);
+        offset = align_to(offset, mem->align);
         mem->offset = offset;
         offset += mem->ty->size;
-        if (ty->align < mem->ty->align)
+        if (ty->align < mem->align)
         {
-            ty->align = mem->ty->align;
+            ty->align = mem->align;
         }
     }
     ty->size = align_to(offset, ty->align);
@@ -1262,9 +1275,9 @@ static Type *union_decl(Token **rest, Token *tok)
     // alignment and the size though.
     for (Member *mem = ty->members; mem; mem = mem->next)
     {
-        if (ty->align < mem->ty->align)
+        if (ty->align < mem->align)
         {
-            ty->align = mem->ty->align;
+            ty->align = mem->align;
         }
         if (ty->size < mem->ty->size)
         {
@@ -1415,6 +1428,26 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
                 error_tok(tok, "typedef may not be used together with static or extern");
             }
             tok = tok->next;
+            continue;
+        }
+
+        if (equal(tok, "_Alignas"))
+        {
+            if (!attr)
+            {
+                error_tok(tok, "_Alignas is not allowed in this context");
+            }
+            tok = skip(tok->next, "(");
+
+            if (is_typename(tok))
+            {
+                attr->align = typename(&tok, tok)->align;
+            }
+            else
+            {
+                attr->align = const_expr(&tok, tok);
+            }
+            tok = skip(tok, ")");
             continue;
         }
 
@@ -2015,7 +2048,7 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var)
 }
 
 // declaration = (declarator ("=" assign)? (",", declarator ("=" assign)?)*)? ";"
-static Node *declaration(Token **rest, Token *tok, Type *basety)
+static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr)
 {
     Node head = {};
     Node *cur = &head;
@@ -2034,6 +2067,10 @@ static Node *declaration(Token **rest, Token *tok, Type *basety)
             error_tok(tok, "variable declared void");
         }
         Obj *var = new_lvar(get_ident(ty->name), ty);
+        if (attr && attr->align)
+        {
+            var->align = attr->align;
+        }
 
         if (!equal(tok, "="))
         {
@@ -2200,7 +2237,7 @@ static Node *stmt(Token **rest, Token *tok)
         if (is_typename(tok))
         {
             Type *basety = declspec(&tok, tok, NULL);
-            node->init = declaration(&tok, tok, basety);
+            node->init = declaration(&tok, tok, basety, NULL);
         }
         else
         {
@@ -2262,20 +2299,10 @@ static Node *stmt(Token **rest, Token *tok)
 
 static bool is_typename(Token *tok)
 {
-    static char *kw[] = {
-        "void",
-        "char",
-        "short",
-        "int",
-        "long",
-        "struct",
-        "union",
-        "typedef",
-        "_Bool",
-        "enum",
-        "static",
-        "extern",
-    };
+    static char *kw[] = {"void", "char", "short", "int",
+                         "long", "struct", "union", "typedef",
+                         "_Bool", "enum", "static", "extern",
+                         "_Alignas"};
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
@@ -2318,7 +2345,7 @@ static Node *compound_stmt(Token **rest, Token *tok)
                 continue;
             }
 
-            cur = cur->next = declaration(&tok, tok, basety);
+            cur = cur->next = declaration(&tok, tok, basety, &attr);
         }
         else
         {
@@ -2502,6 +2529,10 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr)
         Type *ty = declarator(&tok, tok, basety);
         Obj *var = new_gvar(get_ident(ty->name), ty);
         var->is_definition = !attr->is_extern;
+        if (attr->align)
+        {
+            var->align = attr->align;
+        }
         if (equal(tok, "="))
         {
             gvar_initializer(&tok, tok->next, var);

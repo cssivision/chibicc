@@ -83,28 +83,9 @@ bool startswith(char *p, char *q)
 int read_punct(char *p)
 {
     static char *kw[] = {
-        "==",
-        "!=",
-        "<=",
-        ">=",
-        "->",
-        "+=",
-        "-=",
-        "*=",
-        "/=",
-        "++",
-        "--",
-        "%=",
-        "|=",
-        "&=",
-        "^=",
-        "||",
-        "&&",
-        "<<=",
-        ">>=",
-        "<<",
-        ">>",
-    };
+        "==", "!=", "<=", ">=", "->", "+=", "-=", "*=", "/=", "++",
+        "--", "%=", "|=", "&=", "^=", "||", "&&", "<<=", ">>=", "<<",
+        ">>"};
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
         if (startswith(p, kw[i]))
@@ -131,7 +112,8 @@ bool is_keywords(Token *tok)
                          "sizeof", "char", "struct", "union", "short",
                          "long", "void", "typedef", "_Bool", "enum",
                          "static", "goto", "break", "continue",
-                         "switch", "case", "default", "extern"};
+                         "switch", "case", "default", "extern",
+                         "_Alignof", "_Alignas"};
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
         if (equal(tok, kw[i]))
