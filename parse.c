@@ -18,6 +18,7 @@ typedef struct
 {
     bool is_typedef;
     bool is_static;
+    bool is_extern;
 } VarAttr;
 
 // This struct represents a variable initializer. Since initializers
@@ -255,6 +256,7 @@ static Obj *new_gvar(char *name, Type *ty)
 {
     Obj *var = new_var(name, ty);
     var->next = globals;
+    var->is_definition = true;
     globals = var;
     return var;
 }
@@ -1350,7 +1352,7 @@ static Type *enum_specifier(Token **rest, Token *tok)
     return ty;
 }
 
-// declspec = ( "void" | "int" | "char" | _Bool | "long" | "typedef" | "static"
+// declspec = ( "void" | "int" | "char" | _Bool | "long" | "typedef" | "static" | "extern"
 //              struct-decl | union_decl  | typedef-name )+
 //
 // The order of typenames in a type-specifier doesn't matter. For
@@ -1386,7 +1388,7 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
 
     while (is_typename(tok))
     {
-        if (equal(tok, "typedef") || equal(tok, "static"))
+        if (equal(tok, "typedef") || equal(tok, "static") || equal(tok, "extern"))
         {
             if (!attr)
             {
@@ -1396,13 +1398,18 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
             {
                 attr->is_typedef = true;
             }
-            else
+            else if (equal(tok, "static"))
             {
                 attr->is_static = true;
             }
-            if (attr->is_typedef + attr->is_static > 1)
+            else
             {
-                error_tok(tok, "typedef and static may not be used together");
+                attr->is_extern = true;
+            }
+
+            if (attr->is_typedef && attr->is_static + attr->is_extern > 1)
+            {
+                error_tok(tok, "typedef may not be used together with static or extern");
             }
             tok = tok->next;
             continue;
@@ -2264,6 +2271,7 @@ static bool is_typename(Token *tok)
         "_Bool",
         "enum",
         "static",
+        "extern",
     };
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
@@ -2466,7 +2474,7 @@ static void gvar_initializer(Token **rest, Token *tok, Obj *var)
     var->rel = head.next;
 }
 
-static Token *global_variable(Token *tok, Type *basety)
+static Token *global_variable(Token *tok, Type *basety, VarAttr *attr)
 {
     int i = 0;
     while (!equal(tok, ";"))
@@ -2477,6 +2485,7 @@ static Token *global_variable(Token *tok, Type *basety)
         }
         Type *ty = declarator(&tok, tok, basety);
         Obj *var = new_gvar(get_ident(ty->name), ty);
+        var->is_definition = !attr->is_extern;
         if (equal(tok, "="))
         {
             gvar_initializer(&tok, tok->next, var);
@@ -2521,7 +2530,8 @@ Obj *parse(Token *tok)
             tok = function(tok, basety, &attr);
             continue;
         }
-        tok = global_variable(tok, basety);
+
+        tok = global_variable(tok, basety, &attr);
     }
     return globals;
 }
