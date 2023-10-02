@@ -339,6 +339,7 @@ static Obj *new_string_literal(char *str, Type *ty)
 //          | num
 //          | sizeof unary
 //          | "_Alignof" "(" type-name ")"
+//          | "_Alignof" unary
 //          | sizeof "(" type-name ")"
 //          | str
 static Node *primary(Token **rest, Token *tok)
@@ -379,12 +380,20 @@ static Node *primary(Token **rest, Token *tok)
         return new_num(node->ty->size, tok);
     }
 
-    if (equal(tok, "_Alignof"))
+    if (equal(tok, "_Alignof") && equal(tok->next, "(") && is_typename(tok->next->next))
     {
         tok = skip(tok->next, "(");
         Type *ty = typename(&tok, tok);
         *rest = skip(tok, ")");
         return new_num(ty->align, tok);
+    }
+
+    if (equal(tok, "_Alignof"))
+    {
+        Node *node = unary(&tok, tok->next);
+        add_type(node);
+        *rest = tok;
+        return new_num(node->ty->align, tok);
     }
 
     if (tok->kind == TK_STR)
