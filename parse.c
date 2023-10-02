@@ -53,6 +53,7 @@ static Type *typename(Token **rest, Token *tok);
 static char *get_ident(Token *tok);
 static int64_t const_expr(Token **rest, Token *tok);
 static Node *conditional(Token **rest, Token *tok);
+static void gvar_initializer(Token **rest, Token *tok, Obj *var);
 void initializer2(Token **rest, Token *tok, Initializer *init);
 static int64_t eval2(Node *node, char **label);
 static int64_t eval_rval(Node *node, char **label);
@@ -2075,6 +2076,23 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr)
         {
             error_tok(tok, "variable declared void");
         }
+
+        // static local variable
+        if (attr && attr->is_static)
+        {
+            Obj *var = new_anon_gvar(ty);
+            if (attr && attr->align)
+            {
+                var->align = attr->align;
+            }
+            push_scope(get_ident(ty->name))->var = var;
+            if (equal(tok, "="))
+            {
+                gvar_initializer(&tok, tok->next, var);
+            }
+            continue;
+        }
+
         Obj *var = new_lvar(get_ident(ty->name), ty);
         if (attr && attr->align)
         {
