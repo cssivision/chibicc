@@ -2152,7 +2152,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr)
     return node;
 }
 
-// stmt = "return" expr ";"
+// stmt = "return" expr? ";"
 //      | expr-stmt
 //      | "{" compound-stmt
 //      | "if" "(" expr ")" stmt ("else" stmt)?
@@ -2338,6 +2338,10 @@ static Node *stmt(Token **rest, Token *tok)
     if (equal(tok, "return"))
     {
         Node *node = new_node(ND_RETURN, tok);
+        if (consume(rest, tok->next, ";"))
+        {
+            return node;
+        }
         Node *exp = expr(&tok, tok->next);
         tok = skip(tok, ";");
         add_type(exp);

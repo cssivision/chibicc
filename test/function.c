@@ -72,6 +72,11 @@ int counter()
     return i++ + j++;
 }
 
+void ret_none()
+{
+    return;
+}
+
 int main()
 {
     ASSERT(3, ret3());

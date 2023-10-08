@@ -521,7 +521,10 @@ void gen_stmt(Node *node)
         gen_expr(node->lhs);
         return;
     case ND_RETURN:
-        gen_expr(node->lhs);
+        if (node->lhs)
+        {
+            gen_expr(node->lhs);
+        }
         println("  jmp .L.return.%s", current_fn->name);
         return;
     }
