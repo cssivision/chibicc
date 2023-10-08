@@ -113,7 +113,7 @@ bool is_keywords(Token *tok)
                          "long", "void", "typedef", "_Bool", "enum",
                          "static", "goto", "break", "continue",
                          "switch", "case", "default", "extern",
-                         "_Alignof", "_Alignas"};
+                         "_Alignof", "_Alignas", "do"};
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
         if (equal(tok, kw[i]))

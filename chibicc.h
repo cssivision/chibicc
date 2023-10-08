@@ -94,6 +94,7 @@ typedef enum
     ND_BLOCK,     // { .. }
     ND_IF,        // if
     ND_FOR,       // for or while
+    ND_DO,        // do ... while
     ND_EXPR_STMT, // Expression statement
     ND_STMT_EXPR,
     ND_NULL_EXPR
