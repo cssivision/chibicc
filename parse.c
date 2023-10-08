@@ -54,6 +54,7 @@ static char *get_ident(Token *tok);
 static int64_t const_expr(Token **rest, Token *tok);
 static Node *conditional(Token **rest, Token *tok);
 static void gvar_initializer(Token **rest, Token *tok, Obj *var);
+static Node *lvar_initializer(Token **rest, Token *tok, Obj *var);
 void initializer2(Token **rest, Token *tok, Initializer *init);
 static int64_t eval2(Node *node, char **label);
 static int64_t eval_rval(Node *node, char **label);
@@ -498,9 +499,30 @@ static Node *new_inc_dec(Node *node, Token *tok, int addend)
                     node->ty);
 }
 
-// postfix = primary ("[" expr "]" | "." ident  | "->" ident )*
+// postfix = "(" type-name ")" "{" initializer-list "}"
+//         | primary ("[" expr "]" | "." ident | "->" ident | "++" | "--")*
 static Node *postfix(Token **rest, Token *tok)
 {
+    if (equal(tok, "(") && is_typename(tok->next))
+    {
+        // Compound literal
+        Token *start = tok;
+        Type *ty = typename(&tok, tok->next);
+        tok = skip(tok, ")");
+
+        if (scope->next == NULL)
+        {
+            Obj *var = new_anon_gvar(ty);
+            gvar_initializer(rest, tok, var);
+            return new_var_node(var, start);
+        }
+
+        Obj *var = new_lvar("", ty);
+        Node *lhs = lvar_initializer(rest, tok, var);
+        Node *rhs = new_var_node(var, tok);
+        return new_binary(ND_COMMA, lhs, rhs, start);
+    }
+
     Node *node = primary(&tok, tok);
 
     for (;;)
@@ -564,10 +586,20 @@ static Node *cast(Token **rest, Token *tok)
 {
     if (equal(tok, "(") && is_typename(tok->next))
     {
+        Token *start = tok;
         tok = tok->next;
         Type *ty = typename(&tok, tok);
         tok = skip(tok, ")");
+
+        // compound literal
+        if (equal(tok, "{"))
+        {
+            return unary(rest, start);
+        }
+
+        // type cast
         Node *node = new_cast(cast(&tok, tok), ty);
+        node->tok = start;
         *rest = tok;
         return node;
     }
