@@ -12,7 +12,7 @@ $(OBJS): chibicc.h
 
 test/%.exe: chibicc test/%.c
 	$(CC) -o- -E -P -C test/$*.c | ./chibicc -o test/$*.s -
-	$(CC) -o $@ test/$*.s -xc test/common
+	$(CC) $(CFLAGS) -o $@ test/$*.s -xc test/common
 
 test: $(TESTS)
 	for i in $^; do echo $$i; ./$$i || exit 1; echo; done

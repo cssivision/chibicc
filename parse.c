@@ -1586,7 +1586,7 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
     return ty;
 }
 
-// func-params = ("void" | param ("," param)*)?
+// func-params = ("void" | param ("," param)* (",", "...")?)?
 // param = declspec declarator
 static Type *func_params(Token **rest, Token *tok, Type *ty)
 {
@@ -1597,12 +1597,19 @@ static Type *func_params(Token **rest, Token *tok, Type *ty)
     }
     Type head = {};
     Type *cur = &head;
+    bool is_variadic = false;
     int i = 0;
     while (!equal(tok, ")"))
     {
         if (i++ > 0)
         {
             tok = skip(tok, ",");
+        }
+        if (equal(tok, "..."))
+        {
+            tok = tok->next;
+            is_variadic = true;
+            break;
         }
         Type *ty2 = declspec(&tok, tok, NULL);
         ty2 = declarator(&tok, tok, ty2);
@@ -1619,6 +1626,7 @@ static Type *func_params(Token **rest, Token *tok, Type *ty)
         cur = cur->next = copy_type(ty2);
     }
     ty = func_type(ty);
+    ty->is_variadic = is_variadic;
     ty->params = head.next;
     *rest = tok;
     return ty;

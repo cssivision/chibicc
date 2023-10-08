@@ -219,6 +219,7 @@ struct Type
     // Function
     Type *return_ty;
     Type *params;
+    bool is_variadic;
     Type *next;
 
     Member *members;
