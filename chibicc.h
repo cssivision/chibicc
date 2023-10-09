@@ -122,10 +122,6 @@ struct Obj
     bool is_local; // local or global/function
     int align;     // alignment
 
-    Node *body;
-    // Function params
-    Obj *params;
-
     // Global variable or function
     bool is_function;
     bool is_definition;
@@ -135,6 +131,10 @@ struct Obj
     char *init_data;
     Relocation *rel;
 
+    // Function
+    Node *body;
+    Obj *params;
+    Obj *va_area;
     Obj *locals;
     int stack_size;
 };
