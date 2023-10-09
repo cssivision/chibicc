@@ -297,6 +297,11 @@ static Node *funccall(Token **rest, Token *tok)
         {
             tok = skip(tok, ",");
         }
+        if (!param_ty && !ty->is_variadic)
+        {
+            error_tok(tok, "too many arguments");
+        }
+
         Node *arg = assign(&tok, tok);
         add_type(arg);
         if (param_ty)
@@ -310,6 +315,11 @@ static Node *funccall(Token **rest, Token *tok)
         }
         cur = cur->next = arg;
     }
+    if (param_ty)
+    {
+        error_tok(tok, "too few arguments");
+    }
+
     tok = skip(tok, ")");
     node->args = head.next;
     node->ty = ty->return_ty;
@@ -1624,6 +1634,10 @@ static Type *func_params(Token **rest, Token *tok, Type *ty)
         }
 
         cur = cur->next = copy_type(ty2);
+    }
+    if (cur == &head)
+    {
+        is_variadic = true;
     }
     ty = func_type(ty);
     ty->is_variadic = is_variadic;
