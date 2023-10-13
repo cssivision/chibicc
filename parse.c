@@ -204,6 +204,14 @@ static Node *new_long(int64_t val, Token *tok)
     return node;
 }
 
+static Node *new_ulong(int64_t val, Token *tok)
+{
+    Node *node = new_node(ND_NUM, tok);
+    node->val = val;
+    node->ty = ty_ulong;
+    return node;
+}
+
 static Node *new_var_node(Obj *var, Token *tok)
 {
     Node *node = new_node(ND_VAR, tok);
@@ -382,7 +390,7 @@ static Node *primary(Token **rest, Token *tok)
         Type *ty = typename(&tok, tok);
         tok = skip(tok, ")");
         *rest = tok;
-        return new_num(ty->size, start);
+        return new_ulong(ty->size, start);
     }
 
     if (equal(tok, "sizeof"))
@@ -390,7 +398,7 @@ static Node *primary(Token **rest, Token *tok)
         Node *node = unary(&tok, tok->next);
         add_type(node);
         *rest = tok;
-        return new_num(node->ty->size, tok);
+        return new_ulong(node->ty->size, tok);
     }
 
     if (equal(tok, "_Alignof") && equal(tok->next, "(") && is_typename(tok->next->next))
@@ -398,7 +406,7 @@ static Node *primary(Token **rest, Token *tok)
         tok = skip(tok->next, "(");
         Type *ty = typename(&tok, tok);
         *rest = skip(tok, ")");
-        return new_num(ty->align, tok);
+        return new_ulong(ty->align, tok);
     }
 
     if (equal(tok, "_Alignof"))
@@ -406,7 +414,7 @@ static Node *primary(Token **rest, Token *tok)
         Node *node = unary(&tok, tok->next);
         add_type(node);
         *rest = tok;
-        return new_num(node->ty->align, tok);
+        return new_ulong(node->ty->align, tok);
     }
 
     if (tok->kind == TK_STR)
@@ -773,7 +781,7 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok)
     if (lhs->ty->base && rhs->ty->base)
     {
         Node *node = new_binary(ND_SUB, lhs, rhs, tok);
-        node->ty = ty_int;
+        node->ty = ty_long;
         return new_binary(ND_DIV, node, new_num(lhs->ty->base->size, tok), tok);
     }
 
