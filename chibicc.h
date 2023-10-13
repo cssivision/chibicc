@@ -206,6 +206,7 @@ struct Type
 
     int size; // sizeof() value
     int align;
+    bool is_unsigned; // unsigned or signed
 
     // Pointer
     Type *base;
@@ -240,6 +241,10 @@ extern Type *ty_long;
 extern Type *ty_short;
 extern Type *ty_void;
 extern Type *ty_bool;
+extern Type *ty_uchar;
+extern Type *ty_ushort;
+extern Type *ty_uint;
+extern Type *ty_ulong;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);

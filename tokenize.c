@@ -311,12 +311,12 @@ static Token *read_int_literal(char *start)
 {
     char *p = start;
     int base = 10;
-    if (!strncasecmp(p, "0x", 2) && isalnum(p[2]))
+    if (!strncasecmp(p, "0x", 2) && isxdigit(p[2]))
     {
         p += 2;
         base = 16;
     }
-    else if (!strncasecmp(p, "0b", 2) && isalnum(p[2]))
+    else if (!strncasecmp(p, "0b", 2) && (p[2] == '0' || p[2] == '1'))
     {
         p += 2;
         base = 2;
@@ -326,7 +326,41 @@ static Token *read_int_literal(char *start)
         base = 8;
     }
 
-    long val = strtoul(p, &p, base);
+    int64_t val = strtoul(p, &p, base);
+
+    // Read U, L or LL suffixes.
+    bool l = false;
+    bool u = false;
+
+    if (startswith(p, "LLU") || startswith(p, "LLu") ||
+        startswith(p, "llU") || startswith(p, "llu") ||
+        startswith(p, "ULL") || startswith(p, "Ull") ||
+        startswith(p, "uLL") || startswith(p, "ull"))
+    {
+        p += 3;
+        l = u = true;
+    }
+    else if (!strncasecmp(p, "lu", 2) || !strncasecmp(p, "ul", 2))
+    {
+        p += 2;
+        l = u = true;
+    }
+    else if (startswith(p, "LL") || startswith(p, "ll"))
+    {
+        p += 2;
+        l = true;
+    }
+    else if (*p == 'L' || *p == 'l')
+    {
+        p++;
+        l = true;
+    }
+    else if (*p == 'U' || *p == 'u')
+    {
+        p++;
+        u = true;
+    }
+
     if (isalnum(*p))
     {
         error_at(p, "invalid digit");

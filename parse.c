@@ -1421,8 +1421,10 @@ static Type *enum_specifier(Token **rest, Token *tok)
     return ty;
 }
 
-// declspec = ( "void" | "int" | "char" | _Bool | "long" | "signed" | "typedef" | "static" | "extern"
-//              struct-decl | union_decl  | typedef-name )+
+// declspec = ( "void" | "int" | "char" | _Bool | "long"
+//                  | "signed" | "unsigned"
+//                  | "typedef" | "static" | "extern"
+//                  | struct-decl | union_decl  | typedef-name )+
 //
 // The order of typenames in a type-specifier doesn't matter. For
 // example, `int long static` means the same as `static long int`.
@@ -1451,6 +1453,7 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
         LONG = 1 << 10,
         OTHER = 1 << 12,
         SIGNED = 1 << 13,
+        UNSIGNED = 1 << 14,
     };
 
     Type *ty = ty_int;
@@ -1562,6 +1565,10 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
         {
             counter |= SIGNED;
         }
+        else if (equal(tok, "unsigned"))
+        {
+            counter |= UNSIGNED;
+        }
         else
         {
             unreachable();
@@ -1579,16 +1586,27 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
         case SIGNED + CHAR:
             ty = ty_char;
             break;
+        case UNSIGNED + CHAR:
+            ty = ty_uchar;
+            break;
         case SHORT:
         case SHORT + INT:
         case SIGNED + SHORT:
         case SIGNED + SHORT + INT:
             ty = ty_short;
             break;
+        case UNSIGNED + SHORT:
+        case UNSIGNED + SHORT + INT:
+            ty = ty_ushort;
+            break;
         case INT:
         case SIGNED:
         case SIGNED + INT:
             ty = ty_int;
+            break;
+        case UNSIGNED:
+        case UNSIGNED + INT:
+            ty = ty_uint;
             break;
         case LONG:
         case LONG + INT:
@@ -1599,6 +1617,12 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
         case SIGNED + LONG + LONG:
         case SIGNED + LONG + LONG + INT:
             ty = ty_long;
+            break;
+        case UNSIGNED + LONG:
+        case UNSIGNED + LONG + INT:
+        case UNSIGNED + LONG + LONG:
+        case UNSIGNED + LONG + LONG + INT:
+            ty = ty_ulong;
             break;
         default:
             error_tok(tok, "invalid type");
@@ -1648,10 +1672,6 @@ static Type *func_params(Token **rest, Token *tok, Type *ty)
         }
 
         cur = cur->next = copy_type(ty2);
-    }
-    if (cur == &head)
-    {
-        is_variadic = true;
     }
     ty = func_type(ty);
     ty->is_variadic = is_variadic;
@@ -2425,7 +2445,7 @@ static bool is_typename(Token *tok)
     static char *kw[] = {"void", "char", "short", "int",
                          "long", "struct", "union", "typedef",
                          "_Bool", "enum", "static", "extern",
-                         "_Alignas", "signed"};
+                         "_Alignas", "signed", "unsigned"};
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
