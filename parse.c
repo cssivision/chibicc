@@ -419,6 +419,7 @@ static Node *primary(Token **rest, Token *tok)
     if (tok->kind == TK_NUM)
     {
         Node *node = new_num(tok->val, tok);
+        node->ty = tok->ty;
         *rest = tok->next;
         return node;
     }
@@ -804,21 +805,25 @@ static Node *add(Token **rest, Token *tok)
     }
 }
 
-// shift = add (">>" | "<<") bitshift
+// shift = add ( ">>" add | "<<" add)*
 Node *shift(Token **rest, Token *tok)
 {
     Node *node = add(&tok, tok);
-    if (equal(tok, ">>"))
+    for (;;)
     {
-        node = new_binary(ND_SHR, node, shift(&tok, tok->next), tok);
+        if (equal(tok, ">>"))
+        {
+            node = new_binary(ND_SHR, node, add(&tok, tok->next), tok);
+            continue;
+        }
+        if (equal(tok, "<<"))
+        {
+            node = new_binary(ND_SHL, node, add(&tok, tok->next), tok);
+            continue;
+        }
+        *rest = tok;
+        return node;
     }
-
-    if (equal(tok, "<<"))
-    {
-        node = new_binary(ND_SHL, node, shift(&tok, tok->next), tok);
-    }
-    *rest = tok;
-    return node;
 }
 
 // relational = shift ("<" shift | "<=" shift | ">" shift | ">=" shift)*

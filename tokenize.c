@@ -366,8 +366,62 @@ static Token *read_int_literal(char *start)
         error_at(p, "invalid digit");
     }
 
+    // Infer a type.
+    Type *ty;
+    if (base == 10)
+    {
+        if (l && u)
+        {
+            ty = ty_ulong;
+        }
+        else if (l)
+        {
+            ty = ty_long;
+        }
+        else if (u)
+        {
+            ty = (val >> 32) ? ty_ulong : ty_uint;
+        }
+        else
+        {
+            ty = (val >> 31) ? ty_long : ty_int;
+        }
+    }
+    else
+    {
+        if (l && u)
+        {
+            ty = ty_ulong;
+        }
+        else if (l)
+        {
+            ty = (val >> 63) ? ty_ulong : ty_long;
+        }
+        else if (u)
+        {
+            ty = (val >> 32) ? ty_ulong : ty_uint;
+        }
+        else if (val >> 63)
+        {
+            ty = ty_ulong;
+        }
+        else if (val >> 32)
+        {
+            ty = ty_long;
+        }
+        else if (val >> 31)
+        {
+            ty = ty_uint;
+        }
+        else
+        {
+            ty = ty_int;
+        }
+    }
+
     Token *tok = new_token(TK_NUM, start, p);
     tok->val = val;
+    tok->ty = ty;
     return tok;
 }
 
