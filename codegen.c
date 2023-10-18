@@ -237,8 +237,31 @@ void gen_expr(Node *node)
         println("  rep stosb");
         return;
     case ND_NUM:
+    {
+        union
+        {
+            float f32;
+            double f64;
+            uint32_t u32;
+            uint64_t u64;
+        } u;
+        switch (node->ty->kind)
+        {
+        case TY_FLOAT:
+            u.f32 = node->fval;
+            println("  mov $%u, %%eax  # float %f", u.u32, node->fval);
+            println("  movq %%rax, %%xmm0");
+            return;
+        case TY_DOUBLE:
+            u.f64 = node->fval;
+            println("  mov $%lu, %%rax  # double %f", u.u64, node->fval);
+            println("  movq %%rax, %%xmm0");
+            return;
+        }
+
         println("  mov $%ld, %%rax", node->val);
         return;
+    }
     case ND_VAR:
     case ND_MEMBER:
         gen_addr(node);

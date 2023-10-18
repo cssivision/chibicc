@@ -34,6 +34,7 @@ struct Token
     TokenKind kind;
     Token *next;
     int64_t val;
+    double fval;
     char *loc;
     int len;
     Type *ty;
@@ -173,6 +174,7 @@ struct Node
 
     // Numeric literal
     int64_t val;
+    double fval;
 
     Member *member;
 
@@ -196,6 +198,8 @@ typedef enum
     TY_STRUCT,
     TY_UNION,
     TY_LONG,
+    TY_FLOAT,
+    TY_DOUBLE,
     TY_SHORT,
     TY_ENUM
 } TypeKind;
@@ -246,9 +250,12 @@ extern Type *ty_uchar;
 extern Type *ty_ushort;
 extern Type *ty_uint;
 extern Type *ty_ulong;
+extern Type *ty_float;
+extern Type *ty_double;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
+bool is_flonum(Type *ty);
 
 bool equal(Token *tok, char *p);
 bool consume(Token **rest, Token *tok, char *str);
