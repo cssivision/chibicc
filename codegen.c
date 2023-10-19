@@ -40,9 +40,9 @@ static void pushf(void)
     depth++;
 }
 
-static void popf(char *arg)
+static void popf(int reg)
 {
-    println("  movsd (%%rsp), %s", arg);
+    println("  movsd (%%rsp), %%xmm%d", reg);
     println("  add $8, %%rsp");
     depth--;
 }
@@ -310,6 +310,23 @@ static void cast(Type *from, Type *to)
     }
 }
 
+static void push_args(Node *args)
+{
+    if (args)
+    {
+        push_args(args->next);
+        gen_expr(args);
+        if (is_flonum(args->ty))
+        {
+            pushf();
+        }
+        else
+        {
+            push();
+        }
+    }
+}
+
 void gen_expr(Node *node)
 {
     println("  .loc 1 %d", node->tok->line_no);
@@ -457,17 +474,18 @@ void gen_expr(Node *node)
         return;
     case ND_FUNCCALL:
     {
-        int nargs = 0;
+        push_args(node->args);
+        int gp = 0, fp = 0;
         for (Node *n = node->args; n; n = n->next)
         {
-            gen_expr(n);
-            push();
-            nargs++;
-        }
-
-        for (int i = nargs - 1; i >= 0; i--)
-        {
-            pop(argreg64[i]);
+            if (is_flonum(n->ty))
+            {
+                popf(fp++);
+            }
+            else
+            {
+                pop(argreg64[gp++]);
+            }
         }
 
         println("  mov $0, %%rax");
@@ -526,7 +544,7 @@ void gen_expr(Node *node)
         gen_expr(node->rhs);
         pushf();
         gen_expr(node->lhs);
-        popf("%xmm1");
+        popf(1);
 
         char *sz = (node->lhs->ty->kind == TY_FLOAT) ? "ss" : "sd";
 
@@ -887,6 +905,20 @@ void emit_data(Obj *prog)
     }
 }
 
+static void store_fp(int r, int offset, int sz)
+{
+    switch (sz)
+    {
+    case 4:
+        println("  movss %%xmm%d, %d(%%rbp)", r, offset);
+        return;
+    case 8:
+        println("  movsd %%xmm%d, %d(%%rbp)", r, offset);
+        return;
+    }
+    unreachable();
+}
+
 static void store_gp(int r, int offset, int sz)
 {
     switch (sz)
@@ -969,7 +1001,14 @@ void emit_text(Obj *prog)
         int i = 0;
         for (Obj *var = fn->params; var; var = var->next)
         {
-            store_gp(i++, var->offset, var->ty->size);
+            if (is_flonum(var->ty))
+            {
+                store_fp(i++, var->offset, var->ty->size);
+            }
+            else
+            {
+                store_gp(i++, var->offset, var->ty->size);
+            }
         }
 
         gen_stmt(fn->body);

@@ -111,6 +111,16 @@ unsigned short ushort_fn();
 char schar_fn();
 short sshort_fn();
 
+float add_float3(float x, float y, float z)
+{
+    return x + y + z;
+}
+
+double add_double3(double x, double y, double z)
+{
+    return x + y + z;
+}
+
 int main()
 {
     ASSERT(3, ret3());
@@ -171,6 +181,9 @@ int main()
     ASSERT(65528, ushort_fn());
     ASSERT(-5, schar_fn());
     ASSERT(-8, sshort_fn());
+
+    ASSERT(7, add_float3(2.5, 2.5, 2.5));
+    ASSERT(7, add_double3(2.5, 2.5, 2.5));
 
     printf("OK\n");
     return 0;
