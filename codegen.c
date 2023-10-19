@@ -265,6 +265,18 @@ static char *cast_table[][10] = {
 
 void cmp_zero(Type *ty)
 {
+    switch (ty->kind)
+    {
+    case TY_FLOAT:
+        println("  xorps %%xmm1, %%xmm1");
+        println("  ucomiss %%xmm1, %%xmm0");
+        return;
+    case TY_DOUBLE:
+        println("  xorpd %%xmm1, %%xmm1");
+        println("  ucomisd %%xmm1, %%xmm0");
+        return;
+    }
+
     if (is_integer(ty) && ty->size < 4)
     {
         println("  cmp $0, %%eax");
@@ -353,7 +365,7 @@ void gen_expr(Node *node)
         return;
     case ND_NOT:
         gen_expr(node->lhs);
-        println("  cmp $0, %%rax");
+        cmp_zero(node->lhs->ty);
         println("  sete %%al");
         println("  movzx %%al, %%rax");
         return;
@@ -365,10 +377,10 @@ void gen_expr(Node *node)
     {
         int c = count();
         gen_expr(node->lhs);
-        println("  cmp $0, %%rax");
+        cmp_zero(node->lhs->ty);
         println("  je .L.false.%d", c);
         gen_expr(node->rhs);
-        println("  cmp $0, %%rax");
+        cmp_zero(node->rhs->ty);
         println("  je .L.false.%d", c);
         println("  mov $1, %%rax");
         println("  jmp .L.end.%d", c);
@@ -381,10 +393,10 @@ void gen_expr(Node *node)
     {
         int c = count();
         gen_expr(node->lhs);
-        println("  cmp $0, %%rax");
+        cmp_zero(node->lhs->ty);
         println("  jne .L.true.%d", c);
         gen_expr(node->rhs);
-        println("  cmp $0, %%rax");
+        cmp_zero(node->rhs->ty);
         println("  jne .L.true.%d", c);
         println("  mov $0, %%rax");
         println("  jmp .L.end.%d", c);
@@ -418,7 +430,7 @@ void gen_expr(Node *node)
     {
         int c = count();
         gen_expr(node->cond);
-        println("  cmp $0, %%rax");
+        cmp_zero(node->cond->ty);
         println("  je .L.else.%d", c);
         gen_expr(node->then);
         println("  jmp .L.end.%d", c);
@@ -705,7 +717,7 @@ void gen_stmt(Node *node)
         if (node->cond)
         {
             gen_expr(node->cond);
-            println("  cmp $0, %%rax");
+            cmp_zero(node->cond->ty);
             println("  je %s", node->brk_label);
         }
         gen_stmt(node->then);
@@ -725,7 +737,7 @@ void gen_stmt(Node *node)
         gen_stmt(node->then);
         println("%s:", node->cont_label);
         gen_expr(node->cond);
-        println("  cmp $0, %%rax");
+        cmp_zero(node->cond->ty);
         println("  jne .L.begin.%d", c);
         println("%s:", node->brk_label);
         return;
@@ -771,7 +783,7 @@ void gen_stmt(Node *node)
     {
         int c = count();
         gen_expr(node->cond);
-        println("  cmp $0, %%rax");
+        cmp_zero(node->cond->ty);
         println("  je .L.else.%d", c);
         gen_stmt(node->then);
         println("  jmp .L.end.%d", c);
