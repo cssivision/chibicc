@@ -79,6 +79,9 @@ int main()
     ASSERT(4, sizeof(1 ? (short)2 : (char)3));
     ASSERT(8, sizeof(1 ? (long)2 : (char)3));
 
+    ASSERT(4, sizeof(float));
+    ASSERT(8, sizeof(double));
+
     printf("OK\n");
     return 0;
 }
