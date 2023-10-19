@@ -256,6 +256,7 @@ extern Type *ty_double;
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
 bool is_flonum(Type *ty);
+bool is_numeric(Type *ty);
 
 bool equal(Token *tok, char *p);
 bool consume(Token **rest, Token *tok, char *str);

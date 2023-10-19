@@ -14,11 +14,6 @@ Type *ty_ushort = &(Type){TY_SHORT, 2, 2, true};
 Type *ty_uint = &(Type){TY_INT, 4, 4, true};
 Type *ty_ulong = &(Type){TY_LONG, 8, 8, true};
 
-bool is_flonum(Type *ty)
-{
-    return ty->kind == TY_FLOAT || ty->kind == TY_DOUBLE;
-}
-
 static Type *new_type(TypeKind kind, int size, int align)
 {
     Type *ty = calloc(1, sizeof(Type));
@@ -54,7 +49,18 @@ bool is_integer(Type *ty)
            ty->kind == TY_BOOL || ty->kind == TY_ENUM;
 }
 
-Type *pointer_to(Type *base)
+bool is_flonum(Type *ty)
+{
+    return ty->kind == TY_FLOAT || ty->kind == TY_DOUBLE;
+}
+
+bool is_numeric(Type *ty)
+{
+    return is_integer(ty) || is_flonum(ty);
+}
+
+Type *
+pointer_to(Type *base)
 {
     Type *ty = new_type(TY_PTR, 8, 8);
     ty->base = base;

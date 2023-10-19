@@ -395,6 +395,23 @@ void gen_expr(Node *node)
     }
     case ND_NEG:
         gen_expr(node->lhs);
+
+        switch (node->ty->kind)
+        {
+        case TY_FLOAT:
+            println("  mov $1, %%rax");
+            println("  shl $31, %%rax");
+            println("  movq %%rax, %%xmm1");
+            println("  xorps %%xmm1, %%xmm0");
+            return;
+        case TY_DOUBLE:
+            println("  mov $1, %%rax");
+            println("  shl $63, %%rax");
+            println("  movq %%rax, %%xmm1");
+            println("  xorpd %%xmm1, %%xmm0");
+            return;
+        }
+
         println("  neg %%rax");
         return;
     case ND_COND:
@@ -503,6 +520,18 @@ void gen_expr(Node *node)
 
         switch (node->kind)
         {
+        case ND_ADD:
+            println("  add%s %%xmm1, %%xmm0", sz);
+            return;
+        case ND_SUB:
+            println("  sub%s %%xmm1, %%xmm0", sz);
+            return;
+        case ND_MUL:
+            println("  mul%s %%xmm1, %%xmm0", sz);
+            return;
+        case ND_DIV:
+            println("  div%s %%xmm1, %%xmm0", sz);
+            return;
         case ND_EQ:
         case ND_NE:
         case ND_LT:
@@ -592,13 +621,13 @@ void gen_expr(Node *node)
         }
         return;
     case ND_BITOR:
-        println("  or %%rdi, %%rax");
+        println("  or %s, %s", di, ax);
         return;
     case ND_BITXOR:
-        println("  xor %%rdi, %%rax");
+        println("  xor %s, %s", di, ax);
         return;
     case ND_BITAND:
-        println("  and %%rdi, %%rax");
+        println("  and %s, %s", di, ax);
         return;
     case ND_EQ:
     case ND_NE:
