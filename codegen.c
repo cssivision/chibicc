@@ -488,7 +488,6 @@ void gen_expr(Node *node)
             }
         }
 
-        println("  mov $0, %%rax");
         if (depth % 2 == 0)
         {
             println("  call %s", node->funcname);
