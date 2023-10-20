@@ -226,13 +226,14 @@ void add_type(Node *node)
         return;
     case ND_ADDR:
     {
-        if (node->lhs->ty->kind == TY_ARRAY)
+        Type *ty = node->lhs->ty;
+        if (ty->kind == TY_ARRAY)
         {
-            node->ty = pointer_to(node->lhs->ty->base);
+            node->ty = pointer_to(ty->base);
         }
         else
         {
-            node->ty = pointer_to(node->lhs->ty);
+            node->ty = pointer_to(ty);
         }
         return;
     }

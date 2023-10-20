@@ -59,6 +59,7 @@ void initializer2(Token **rest, Token *tok, Initializer *init);
 static Type *pointers(Token **rest, Token *tok, Type *ty);
 static int64_t eval2(Node *node, char **label);
 static int64_t eval_rval(Node *node, char **label);
+static Node *funccall(Token **rest, Token *tok, Node *fn);
 static bool is_typename(Token *tok);
 static bool is_function(Token *tok);
 static Token *function(Token *tok, Type *basety, VarAttr *attr);
@@ -278,23 +279,19 @@ static Obj *new_gvar(char *name, Type *ty)
     return var;
 }
 
-// funcall = ident "(" (assign ("," assign)*)? ")"
-static Node *funccall(Token **rest, Token *tok)
+// funcall = "(" (assign ("," assign)*)? ")"
+static Node *funccall(Token **rest, Token *tok, Node *fn)
 {
-    Node *node = new_node(ND_FUNCCALL, tok);
-    VarScope *sc = find_var(tok);
-    if (!sc)
+    add_type(fn);
+
+    if (fn->ty->kind != TY_FUNC &&
+        (fn->ty->kind != TY_PTR || fn->ty->base->kind != TY_FUNC))
     {
-        error_tok(tok, "implicit declaration of a function");
+        error_tok(fn->tok, "not a function");
     }
-    if (!sc->var || sc->var->ty->kind != TY_FUNC)
-    {
-        error_tok(tok, "not a function");
-    }
-    node->funcname = strndup(tok->loc, tok->len);
-    tok = tok->next;
-    tok = skip(tok, "(");
-    Type *ty = sc->var->ty;
+
+    Node *node = new_unary(ND_FUNCCALL, fn, tok);
+    Type *ty = (fn->ty->kind == TY_FUNC) ? fn->ty : fn->ty->base;
     Type *param_ty = ty->params;
 
     Node head = {};
@@ -338,7 +335,6 @@ static Node *funccall(Token **rest, Token *tok)
     tok = skip(tok, ")");
     node->args = head.next;
     node->ty = ty->return_ty;
-    node->func_ty = ty;
     *rest = tok;
     return node;
 }
@@ -363,7 +359,7 @@ static Obj *new_string_literal(char *str, Type *ty)
 
 // primary = "(" expr ")"
 //          | ("{" stmt+ "}")
-//          | ident func-args?
+//          | ident
 //          | num
 //          | sizeof unary
 //          | "_Alignof" "(" type-name ")"
@@ -451,28 +447,24 @@ static Node *primary(Token **rest, Token *tok)
 
     if (tok->kind == TK_IDENT)
     {
+        VarScope *vs = find_var(tok);
+        *rest = tok->next;
+        if (vs)
+        {
+            if (vs->var)
+            {
+                return new_var_node(vs->var, tok);
+            }
+            else
+            {
+                return new_num(vs->enum_val, tok);
+            }
+        }
         if (equal(tok->next, "("))
         {
-            return funccall(rest, tok);
+            error_tok(tok, "implicit declaration of a function");
         }
-
-        VarScope *vs = find_var(tok);
-        if (!vs || (!vs->var && !vs->enum_ty))
-        {
-            error_tok(tok, "undefined variable");
-        }
-
-        Node *node;
-        if (vs->var)
-        {
-            node = new_var_node(vs->var, tok);
-        }
-        else
-        {
-            node = new_num(vs->enum_val, tok);
-        }
-        *rest = tok->next;
-        return node;
+        error_tok(tok, "undefined variable");
     }
 
     error_tok(tok, "expected an expression");
@@ -537,7 +529,14 @@ static Node *new_inc_dec(Node *node, Token *tok, int addend)
 }
 
 // postfix = "(" type-name ")" "{" initializer-list "}"
-//         | primary ("[" expr "]" | "." ident | "->" ident | "++" | "--")*
+//         | primary "(" func-args ")" postfix-tail*
+//         | primary postfix-tail*
+// postfix-tail = "[" expr "]"
+//              | "(" func-args ")"
+//              | "." ident
+//              | "->" ident
+//              | "++"
+//              | "--"
 static Node *postfix(Token **rest, Token *tok)
 {
     if (equal(tok, "(") && is_typename(tok->next))
@@ -561,9 +560,13 @@ static Node *postfix(Token **rest, Token *tok)
     }
 
     Node *node = primary(&tok, tok);
-
     for (;;)
     {
+        if (equal(tok, "("))
+        {
+            node = funccall(&tok, tok->next, node);
+            continue;
+        }
         if (equal(tok, "["))
         {
             // x[y] is short for *(x+y)
@@ -573,21 +576,18 @@ static Node *postfix(Token **rest, Token *tok)
             node = new_unary(ND_DEREF, new_add(node, idx, start), start);
             continue;
         }
-
         if (equal(tok, "++"))
         {
             node = new_inc_dec(node, tok, 1);
             tok = tok->next;
             continue;
         }
-
         if (equal(tok, "--"))
         {
             node = new_inc_dec(node, tok, -1);
             tok = tok->next;
             continue;
         }
-
         if (equal(tok, "."))
         {
             tok = tok->next;
@@ -1915,10 +1915,6 @@ static Type *declarator(Token **rest, Token *tok, Type *ty)
         return declarator(&tok, start->next, ty);
     }
 
-    if (tok->kind != TK_IDENT)
-    {
-        error_tok(tok, "expected a variable name");
-    }
     Token *name = NULL;
     Token *name_pos = tok;
     if (tok->kind == TK_IDENT)

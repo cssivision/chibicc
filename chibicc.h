@@ -161,9 +161,8 @@ struct Node
 
     Node *body; // use if kind == ND_BLOCK
 
-    char *funcname;
+    // Function
     Node *args;
-    Type *func_ty;
 
     // Switch-cases
     Node *case_next;
