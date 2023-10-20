@@ -984,6 +984,46 @@ static int64_t eval(Node *node)
     return eval2(node, NULL);
 }
 
+static double eval_double(Node *node)
+{
+    add_type(node);
+
+    if (is_integer(node->ty))
+    {
+        if (node->ty->is_unsigned)
+            return (unsigned long)eval(node);
+        return eval(node);
+    }
+
+    switch (node->kind)
+    {
+    case ND_ADD:
+        return eval_double(node->lhs) + eval_double(node->rhs);
+    case ND_SUB:
+        return eval_double(node->lhs) - eval_double(node->rhs);
+    case ND_MUL:
+        return eval_double(node->lhs) * eval_double(node->rhs);
+    case ND_DIV:
+        return eval_double(node->lhs) / eval_double(node->rhs);
+    case ND_NEG:
+        return -eval_double(node->lhs);
+    case ND_COND:
+        return eval_double(node->cond) ? eval_double(node->then) : eval_double(node->els);
+    case ND_COMMA:
+        return eval_double(node->rhs);
+    case ND_CAST:
+        if (is_flonum(node->lhs->ty))
+        {
+            return eval_double(node->lhs);
+        }
+        return eval(node->lhs);
+    case ND_NUM:
+        return node->fval;
+    }
+
+    error_tok(node->tok, "not a compile-time constant");
+}
+
 // Evaluate a given node as a constant expression.
 //
 // A constant expression is either just a number or ptr+n where ptr
@@ -993,6 +1033,11 @@ static int64_t eval(Node *node)
 static int64_t eval2(Node *node, char **label)
 {
     add_type(node);
+
+    if (is_flonum(node->ty))
+    {
+        return eval_double(node);
+    }
 
     switch (node->kind)
     {
@@ -2759,6 +2804,18 @@ static Relocation *write_gvar_data(Relocation *cur, Initializer *init, char *buf
 
     if (!init->expr)
     {
+        return cur;
+    }
+
+    if (init->ty->kind == TY_FLOAT)
+    {
+        *(float *)(buf + offset) = eval_double(init->expr);
+        return cur;
+    }
+
+    if (init->ty->kind == TY_DOUBLE)
+    {
+        *(double *)(buf + offset) = eval_double(init->expr);
         return cur;
     }
 
