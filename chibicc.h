@@ -9,6 +9,9 @@
 #include "errno.h"
 #include "stdbool.h"
 #include "assert.h"
+#include "sys/types.h"
+#include "sys/wait.h"
+#include "unistd.h"
 
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
