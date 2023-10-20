@@ -81,6 +81,7 @@ int main()
 
     ASSERT(4, sizeof(float));
     ASSERT(8, sizeof(double));
+    ASSERT(8, sizeof(long double));
 
     printf("OK\n");
     return 0;

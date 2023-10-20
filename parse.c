@@ -1755,6 +1755,7 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
             ty = ty_float;
             break;
         case DOUBLE:
+        case LONG + DOUBLE:
             ty = ty_double;
             break;
         default:
