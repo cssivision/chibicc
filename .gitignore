@@ -4,3 +4,4 @@ tmp*
 chibicc
 test/*.s
 test/*.exe
+/stage2
