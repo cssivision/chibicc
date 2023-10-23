@@ -3,6 +3,9 @@
 static char *current_input;
 static char *current_filename;
 
+// True if the current position is at the beginning of a line
+static bool at_bol;
+
 // Reports an error message in the following format and exit.
 //
 // foo.c:10: x = y + 1;
@@ -61,6 +64,8 @@ Token *new_token(TokenKind kind, char *start, char *end)
     tok->kind = kind;
     tok->loc = start;
     tok->len = end - start;
+    tok->at_bol = at_bol;
+    at_bol = false;
     return tok;
 }
 
@@ -467,6 +472,8 @@ Token *tokenize(char *path, char *p)
     Token head = {};
     Token *cur = &head;
 
+    at_bol = true;
+
     while (*p)
     {
         // Skip line comments.
@@ -489,6 +496,14 @@ Token *tokenize(char *path, char *p)
                 error_at(p, "unclosed block comment");
             }
             p = q + 2;
+            continue;
+        }
+
+        // Skip newline.
+        if (*p == '\n')
+        {
+            p++;
+            at_bol = true;
             continue;
         }
 

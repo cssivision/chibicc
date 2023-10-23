@@ -56,6 +56,7 @@ struct Token
     char *str;
 
     int line_no; // Line number
+    bool at_bol; // True if this token is at beginning of line
 };
 
 struct Member
