@@ -4,6 +4,7 @@
 #include "stdint.h"
 #include "stdlib.h"
 #include "string.h"
+#include "libgen.h"
 #include "strings.h"
 #include "ctype.h"
 #include "errno.h"
@@ -12,6 +13,15 @@
 #include "sys/types.h"
 #include "sys/wait.h"
 #include "unistd.h"
+
+typedef struct
+{
+    char **data;
+    int capacity;
+    int len;
+} StringArray;
+
+void strarray_push(StringArray *arr, char *s);
 
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
