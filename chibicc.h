@@ -7,12 +7,14 @@
 #include "libgen.h"
 #include "strings.h"
 #include "ctype.h"
+#include "glob.h"
 #include "errno.h"
 #include "stdbool.h"
 #include "assert.h"
 #include "sys/types.h"
 #include "sys/wait.h"
 #include "unistd.h"
+#include "sys/stat.h"
 
 typedef struct
 {

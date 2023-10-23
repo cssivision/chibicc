@@ -1,10 +1,10 @@
 #include "chibicc.h"
 
 static bool opt_S;
+static bool opt_c;
 static bool opt_cc1;
 static bool opt_hash_hash_hash;
 static char *opt_o;
-static char *input_path;
 static char *base_file;
 static char *output_file;
 
@@ -74,7 +74,11 @@ static void parse_args(int argc, char **argv)
             continue;
         }
 
-        input_path = argv[i];
+        if (!strcmp(argv[i], "-c"))
+        {
+            opt_c = true;
+            continue;
+        }
 
         if (!strcmp(argv[i], "-cc1-input"))
         {
@@ -96,7 +100,7 @@ static void parse_args(int argc, char **argv)
         strarray_push(&input_paths, argv[i]);
     }
 
-    if (!input_path)
+    if (input_paths.len == 0)
     {
         error("no input files");
     }
@@ -189,6 +193,13 @@ char *replace_extn(char *tmpl, char *extn)
     return format("%s%s", filename, extn);
 }
 
+static bool endswith(char *p, char *q)
+{
+    int len1 = strlen(p);
+    int len2 = strlen(q);
+    return (len1 >= len2) && !strcmp(p + len1 - len2, q);
+}
+
 static char *create_tmpfile(void)
 {
     char *path = strdup("/tmp/chibicc-XXXXXX");
@@ -217,6 +228,99 @@ static void assemble(char *input, char *output)
     run_subprocess(cmd);
 }
 
+static char *find_file(char *pattern)
+{
+    char *path = NULL;
+    glob_t buf = {};
+    glob(pattern, 0, NULL, &buf);
+    if (buf.gl_pathc > 0)
+        path = strdup(buf.gl_pathv[buf.gl_pathc - 1]);
+    globfree(&buf);
+    return path;
+}
+
+// Returns true if a given file exists.
+static bool file_exists(char *path)
+{
+    struct stat st;
+    return !stat(path, &st);
+}
+
+static char *find_libpath(void)
+{
+    if (file_exists("/usr/lib/x86_64-linux-gnu/crti.o"))
+        return "/usr/lib/x86_64-linux-gnu";
+    if (file_exists("/usr/lib64/crti.o"))
+        return "/usr/lib64";
+    error("library path is not found");
+}
+
+static char *find_gcc_libpath(void)
+{
+    char *paths[] = {
+        "/usr/lib/gcc/x86_64-linux-gnu/*/crtbegin.o",
+        "/usr/lib/gcc/x86_64-pc-linux-gnu/*/crtbegin.o", // For Gentoo
+        "/usr/lib/gcc/x86_64-redhat-linux/*/crtbegin.o", // For Fedora
+    };
+
+    for (int i = 0; i < sizeof(paths) / sizeof(*paths); i++)
+    {
+        char *path = find_file(paths[i]);
+        if (path)
+        {
+            return dirname(path);
+        }
+    }
+
+    error("gcc library path is not found");
+}
+
+static void run_linker(StringArray *inputs, char *output)
+{
+    StringArray arr = {};
+
+    strarray_push(&arr, "ld");
+    strarray_push(&arr, "-o");
+    strarray_push(&arr, output);
+    strarray_push(&arr, "-m");
+    strarray_push(&arr, "elf_x86_64");
+    strarray_push(&arr, "-dynamic-linker");
+    strarray_push(&arr, "/lib64/ld-linux-x86-64.so.2");
+
+    char *libpath = find_libpath();
+    char *gcc_libpath = find_gcc_libpath();
+
+    strarray_push(&arr, format("%s/crt1.o", libpath));
+    strarray_push(&arr, format("%s/crti.o", libpath));
+    strarray_push(&arr, format("%s/crtbegin.o", gcc_libpath));
+    strarray_push(&arr, format("-L%s", gcc_libpath));
+    strarray_push(&arr, format("-L%s", libpath));
+    strarray_push(&arr, format("-L%s/..", libpath));
+    strarray_push(&arr, "-L/usr/lib64");
+    strarray_push(&arr, "-L/lib64");
+    strarray_push(&arr, "-L/usr/lib/x86_64-linux-gnu");
+    strarray_push(&arr, "-L/usr/lib/x86_64-pc-linux-gnu");
+    strarray_push(&arr, "-L/usr/lib/x86_64-redhat-linux");
+    strarray_push(&arr, "-L/usr/lib");
+    strarray_push(&arr, "-L/lib");
+
+    for (int i = 0; i < inputs->len; i++)
+    {
+        strarray_push(&arr, inputs->data[i]);
+    }
+
+    strarray_push(&arr, "-lc");
+    strarray_push(&arr, "-lgcc");
+    strarray_push(&arr, "--as-needed");
+    strarray_push(&arr, "-lgcc_s");
+    strarray_push(&arr, "--no-as-needed");
+    strarray_push(&arr, format("%s/crtend.o", gcc_libpath));
+    strarray_push(&arr, format("%s/crtn.o", libpath));
+    strarray_push(&arr, NULL);
+
+    run_subprocess(arr.data);
+}
+
 int main(int argc, char **argv)
 {
     atexit(cleanup);
@@ -228,24 +332,12 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    if (input_paths.len > 1 && opt_o)
+    if (input_paths.len > 1 && opt_o && (opt_c || opt_S))
     {
-        error("cannot specify '-o' with multiple files");
+        error("cannot specify '-o' with '-c' or '-S' with multiple files");
     }
 
-    char *output;
-    if (opt_o)
-    {
-        output = opt_o;
-    }
-    else if (opt_S)
-    {
-        output = replace_extn(input_path, ".s");
-    }
-    else
-    {
-        output = replace_extn(input_path, ".o");
-    }
+    StringArray ld_args = {};
 
     for (int i = 0; i < input_paths.len; i++)
     {
@@ -265,6 +357,29 @@ int main(int argc, char **argv)
             output = replace_extn(input, ".o");
         }
 
+        // Handle .o
+        if (endswith(input, ".o"))
+        {
+            strarray_push(&ld_args, input);
+            continue;
+        }
+
+        // Handle .s
+        if (endswith(input, ".s"))
+        {
+            if (!opt_S)
+            {
+                assemble(input, output);
+            }
+            continue;
+        }
+
+        // Handle .c
+        if (!endswith(input, ".c") && strcmp(input, "-"))
+        {
+            error("unknown file extension: %s", input);
+        }
+
         // If -S is given, assembly text is the final output.
         if (opt_S)
         {
@@ -272,10 +387,26 @@ int main(int argc, char **argv)
             continue;
         }
 
-        // Otherwise, run the assembler to assemble our output.
-        char *tmpfile = create_tmpfile();
-        run_cc1(argc, argv, input, tmpfile);
-        assemble(tmpfile, output);
+        // Compile and assemble
+        if (opt_c)
+        {
+            char *tmpfile = create_tmpfile();
+            run_cc1(argc, argv, input, tmpfile);
+            assemble(tmpfile, output);
+            continue;
+        }
+
+        // Compile, assemble and link
+        char *tmp1 = create_tmpfile();
+        char *tmp2 = create_tmpfile();
+        run_cc1(argc, argv, input, tmp1);
+        assemble(tmp1, tmp2);
+        strarray_push(&ld_args, tmp2);
+    }
+
+    if (ld_args.len > 0)
+    {
+        run_linker(&ld_args, opt_o ? opt_o : "a.out");
     }
     return 0;
 }
