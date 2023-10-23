@@ -177,6 +177,7 @@ static void cc1(void)
 {
     Token *tok = tokenize_file(base_file);
     Obj *prog = parse(tok);
+    preprocess(tok);
     FILE *out = open_file(output_file);
     fprintf(out, ".file 1 \"%s\"\n", base_file);
     codegen(prog, out);

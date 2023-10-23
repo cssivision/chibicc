@@ -281,6 +281,13 @@ Token *tokenize_file(char *path);
 Obj *parse(Token *tok);
 void codegen(Obj *prog, FILE *out);
 int align_to(int n, int align);
+void convert_keywords(Token *tok);
 
 #define unreachable() \
     error("internal error at %s:%d", __FILE__, __LINE__)
+
+//
+// preprocess.c
+//
+
+Token *preprocess(Token *tok);

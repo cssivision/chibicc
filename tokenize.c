@@ -543,7 +543,6 @@ Token *tokenize(char *path, char *p)
     }
 
     cur = cur->next = new_token(TK_EOF, p, p);
-    convert_keywords(head.next);
     add_line_numbers(head.next);
     return head.next;
 }
