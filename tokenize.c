@@ -34,6 +34,14 @@ void verror_at(char *filename, char *input, int line_no, char *loc, char *fmt, v
     fprintf(stderr, "\n");
 }
 
+void warn_tok(Token *tok, char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    verror_at(tok->file->name, tok->file->contents, tok->line_no, tok->loc, fmt, ap);
+    va_end(ap);
+}
+
 void error_at(char *loc, char *fmt, ...)
 {
     int line_no = 1;

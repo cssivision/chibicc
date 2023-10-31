@@ -5,7 +5,7 @@ static bool opt_c;
 static bool opt_cc1;
 static bool opt_hash_hash_hash;
 static char *opt_o;
-static char *base_file;
+char *base_file;
 static char *output_file;
 
 static StringArray input_paths;

@@ -13,6 +13,22 @@ static Token *copy_token(Token *tok)
     return t;
 }
 
+// Some preprocessor directives such as #include allow extraneous
+// tokens before newline. This function skips such tokens.
+static Token *skip_line(Token *tok)
+{
+    if (tok->at_bol)
+    {
+        return tok;
+    }
+    warn_tok(tok, "extra token");
+    while (tok->at_bol)
+    {
+        tok = tok->next;
+    }
+    return tok;
+}
+
 // Append tok2 to the end of tok1.
 static Token *append(Token *tok1, Token *tok2)
 {
@@ -66,7 +82,8 @@ static Token *preprocess2(Token *tok)
             {
                 error_tok(tok, "%s", strerror(errno));
             }
-            tok = append(tok2, tok->next);
+            tok = skip_line(tok->next);
+            tok = append(tok2, tok);
             continue;
         }
 

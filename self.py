@@ -12,6 +12,7 @@ typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
 typedef unsigned long uint64_t;
+typedef unsigned long size_t;
 typedef struct FILE FILE;
 extern FILE *stdin;
 extern FILE *stdout;
@@ -82,6 +83,8 @@ int execvp(char *file, char **argv);
 void _exit(int code);
 int wait(int *wstatus);
 int atexit(void (*)(void));
+FILE *open_memstream(char **ptr, size_t *sizeloc);
+char *dirname(char *path);
 """)
 
 for path in sys.argv[1:]:
@@ -95,7 +98,8 @@ for path in sys.argv[1:]:
         s = re.sub(r'\btrue\b', '1', s)
         s = re.sub(r'\bfalse\b', '0', s)
         s = re.sub(r'\bNULL\b', '0', s)
-        s = re.sub(r'\bva_start\(([^)]*),([^)]*)\)', '*(\\1)=*(__va_elem*)__va_area__', s)
+        s = re.sub(r'\bva_start\(([^)]*),([^)]*)\)',
+                   '*(\\1)=*(__va_elem*)__va_area__', s)
         s = re.sub(r'\bunreachable\(\)', 'error("unreachable")', s)
         s = re.sub(r'\bMIN\(([^)]*),([^)]*)\)', '((\\1)<(\\2)?(\\1):(\\2))', s)
         print(s)

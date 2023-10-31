@@ -278,6 +278,7 @@ extern Type *ty_double;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
+void warn_tok(Token *tok, char *fmt, ...);
 bool is_flonum(Type *ty);
 bool is_numeric(Type *ty);
 
@@ -301,3 +302,9 @@ File **get_input_files(void);
 //
 
 Token *preprocess(Token *tok);
+
+//
+// main.c
+//
+
+extern char *base_file;
