@@ -44,6 +44,13 @@ typedef enum
     TK_STR // "str"
 } TokenKind;
 
+typedef struct
+{
+    char *name;
+    int file_no;
+    char *contents;
+} File;
+
 struct Token
 {
     TokenKind kind;
@@ -54,6 +61,7 @@ struct Token
     int len;
     Type *ty;
     char *str;
+    File *file;
 
     int line_no; // Line number
     bool at_bol; // True if this token is at beginning of line
@@ -283,6 +291,7 @@ Obj *parse(Token *tok);
 void codegen(Obj *prog, FILE *out);
 int align_to(int n, int align);
 void convert_keywords(Token *tok);
+File **get_input_files(void);
 
 #define unreachable() \
     error("internal error at %s:%d", __FILE__, __LINE__)

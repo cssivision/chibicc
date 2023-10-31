@@ -176,10 +176,13 @@ static void run_cc1(int argc, char **argv, char *input, char *output)
 static void cc1(void)
 {
     Token *tok = tokenize_file(base_file);
+    if (!tok)
+    {
+        error("%s: %s", base_file, strerror(errno));
+    }
     tok = preprocess(tok);
     Obj *prog = parse(tok);
     FILE *out = open_file(output_file);
-    fprintf(out, ".file 1 \"%s\"\n", base_file);
     codegen(prog, out);
 }
 

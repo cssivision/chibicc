@@ -1,7 +1,7 @@
 #include "chibicc.h"
 
-static char *current_input;
-static char *current_filename;
+static File *current_file;
+static File **input_files;
 
 // True if the current position is at the beginning of a line
 static bool at_bol;
@@ -10,10 +10,10 @@ static bool at_bol;
 //
 // foo.c:10: x = y + 1;
 //               ^ <error message here>
-void verror_at(int line_no, char *loc, char *fmt, va_list ap)
+void verror_at(char *filename, char *input, int line_no, char *loc, char *fmt, va_list ap)
 {
     char *line = loc;
-    while (line > current_input && line[-1] != '\n')
+    while (line > input && line[-1] != '\n')
     {
         line--;
     }
@@ -22,7 +22,7 @@ void verror_at(int line_no, char *loc, char *fmt, va_list ap)
     {
         end++;
     }
-    int indent = fprintf(stderr, "%s:%d: ", current_filename, line_no);
+    int indent = fprintf(stderr, "%s:%d: ", filename, line_no);
     fprintf(stderr, "%.*s\n", (int)(end - line), line);
 
     // Show the error message.
@@ -37,7 +37,7 @@ void verror_at(int line_no, char *loc, char *fmt, va_list ap)
 void error_at(char *loc, char *fmt, ...)
 {
     int line_no = 1;
-    for (char *p = current_input; p < loc; p++)
+    for (char *p = current_file->contents; p < loc; p++)
     {
         if (*p == '\n')
         {
@@ -46,7 +46,7 @@ void error_at(char *loc, char *fmt, ...)
     }
     va_list ap;
     va_start(ap, fmt);
-    verror_at(line_no, loc, fmt, ap);
+    verror_at(current_file->name, current_file->contents, line_no, loc, fmt, ap);
     exit(1);
 }
 
@@ -54,7 +54,7 @@ void error_tok(Token *tok, char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    verror_at(tok->line_no, tok->loc, fmt, ap);
+    verror_at(tok->file->name, tok->file->contents, tok->line_no, tok->loc, fmt, ap);
     exit(1);
 }
 
@@ -65,6 +65,7 @@ Token *new_token(TokenKind kind, char *start, char *end)
     tok->loc = start;
     tok->len = end - start;
     tok->at_bol = at_bol;
+    tok->file = current_file;
     at_bol = false;
     return tok;
 }
@@ -270,7 +271,7 @@ Token *read_string_literal(char *start)
 // Initialize line info for all tokens.
 static void add_line_numbers(Token *tok)
 {
-    char *p = current_input;
+    char *p = current_file->contents;
     int n = 1;
 
     do
@@ -464,10 +465,10 @@ static Token *read_number(char *start)
     return tok;
 }
 
-Token *tokenize(char *path, char *p)
+Token *tokenize(File *file)
 {
-    current_filename = path;
-    current_input = p;
+    current_file = file;
+    char *p = current_file->contents;
 
     Token head = {};
     Token *cur = &head;
@@ -583,7 +584,7 @@ char *read_file(char *path)
         fp = fopen(path, "r");
         if (!fp)
         {
-            error("cannot open %s: %s", path, strerror(errno));
+            return NULL;
         }
     }
 
@@ -616,7 +617,36 @@ char *read_file(char *path)
     return buf;
 }
 
+static File *new_file(char *name, int file_no, char *contents)
+{
+    File *file = calloc(1, sizeof(File));
+    file->name = name;
+    file->file_no = file_no;
+    file->contents = contents;
+    return file;
+}
+
+File **get_input_files(void)
+{
+    return input_files;
+}
+
 Token *tokenize_file(char *path)
 {
-    return tokenize(path, read_file(path));
+    char *p = read_file(path);
+    if (!p)
+    {
+        return NULL;
+    }
+
+    static int file_no;
+    File *file = new_file(path, file_no + 1, p);
+
+    // Save the filename for assembler .file directive.
+    input_files = realloc(input_files, sizeof(char *) * (file_no + 2));
+    input_files[file_no] = file;
+    input_files[file_no + 1] = NULL;
+    file_no++;
+
+    return tokenize(file);
 }
