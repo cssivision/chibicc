@@ -284,6 +284,7 @@ bool is_numeric(Type *ty);
 
 bool equal(Token *tok, char *p);
 bool consume(Token **rest, Token *tok, char *str);
+int64_t const_expr(Token **rest, Token *tok);
 
 char *format(char *fmt, ...);
 

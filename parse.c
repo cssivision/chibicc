@@ -51,7 +51,7 @@ static Node *expr(Token **rest, Token *tok);
 static Type *type_suffix(Token **rest, Token *tok, Type *ty);
 static Type *typename(Token **rest, Token *tok);
 static char *get_ident(Token *tok);
-static int64_t const_expr(Token **rest, Token *tok);
+int64_t const_expr(Token **rest, Token *tok);
 static Node *conditional(Token **rest, Token *tok);
 static void gvar_initializer(Token **rest, Token *tok, Obj *var);
 static Node *lvar_initializer(Token **rest, Token *tok, Obj *var);
@@ -1184,7 +1184,7 @@ static int64_t eval_rval(Node *node, char **label)
     error_tok(node->tok, "invalid initializer");
 }
 
-static int64_t const_expr(Token **rest, Token *tok)
+int64_t const_expr(Token **rest, Token *tok)
 {
     Node *node = conditional(rest, tok);
     return eval(node);
