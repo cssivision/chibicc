@@ -2440,7 +2440,9 @@ static Node *stmt(Token **rest, Token *tok)
     if (equal(tok, "break"))
     {
         if (!brk_label)
+        {
             error_tok(tok, "stray break");
+        }
         Node *node = new_node(ND_GOTO, tok);
         node->unique_label = brk_label;
         *rest = skip(tok->next, ";");
@@ -2450,7 +2452,9 @@ static Node *stmt(Token **rest, Token *tok)
     if (equal(tok, "continue"))
     {
         if (!cont_label)
+        {
             error_tok(tok, "stray continue");
+        }
         Node *node = new_node(ND_GOTO, tok);
         node->unique_label = cont_label;
         *rest = skip(tok->next, ";");

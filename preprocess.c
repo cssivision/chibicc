@@ -59,12 +59,22 @@ static Token *append(Token *tok1, Token *tok2)
 }
 
 // Skip until next `#endif`.
+// Nested `#if` and `#endif` are skipped.
 static Token *skip_cond_incl(Token *tok)
 {
     while (tok->kind != TK_EOF)
     {
+        if (is_hash(tok) && equal(tok->next, "if"))
+        {
+            tok = skip_cond_incl(tok->next->next);
+            tok = tok->next;
+            continue;
+        }
+
         if (is_hash(tok) && equal(tok->next, "endif"))
-            return tok;
+        {
+            break;
+        }
         tok = tok->next;
     }
     return tok;
@@ -212,6 +222,10 @@ static Token *preprocess2(Token *tok)
 Token *preprocess(Token *tok)
 {
     tok = preprocess2(tok);
+    if (cond_incl)
+    {
+        error_tok(cond_incl->tok, "unterminated conditional directive");
+    }
     convert_keywords(tok);
     return tok;
 }
