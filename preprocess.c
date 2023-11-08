@@ -1,5 +1,7 @@
 #include "chibicc.h"
 
+static Token *preprocess2(Token *tok);
+
 typedef struct Macro Macro;
 struct Macro
 {
@@ -147,6 +149,8 @@ static long eval_const_expr(Token **rest, Token *tok)
 {
     Token *start = tok;
     Token *expr = copy_line(rest, tok->next);
+
+    expr = preprocess2(expr);
 
     if (expr->kind == TK_EOF)
     {
