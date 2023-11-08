@@ -33,6 +33,7 @@ typedef struct Token Token;
 typedef struct Obj Obj;
 typedef struct Node Node;
 typedef struct Member Member;
+typedef struct Hideset Hideset;
 
 typedef enum
 {
@@ -63,8 +64,9 @@ struct Token
     char *str;
     File *file;
 
-    int line_no; // Line number
-    bool at_bol; // True if this token is at beginning of line
+    int line_no;      // Line number
+    bool at_bol;      // True if this token is at beginning of line
+    Hideset *hideset; // For macro expansion
 };
 
 struct Member
