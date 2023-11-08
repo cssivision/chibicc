@@ -112,7 +112,8 @@ static Token *skip_cond_incl2(Token *tok)
 {
     while (tok->kind != TK_EOF)
     {
-        if (is_hash(tok) && equal(tok->next, "if"))
+        if (is_hash(tok) && (equal(tok->next, "if") || equal(tok->next, "ifdef") ||
+                             equal(tok->next, "ifndef")))
         {
             tok = skip_cond_incl2(tok->next->next);
             continue;
@@ -131,7 +132,8 @@ static Token *skip_cond_incl(Token *tok)
 {
     while (tok->kind != TK_EOF)
     {
-        if (is_hash(tok) && equal(tok->next, "if"))
+        if (is_hash(tok) && (equal(tok->next, "if") || equal(tok->next, "ifdef") ||
+                             equal(tok->next, "ifndef")))
         {
             tok = skip_cond_incl2(tok->next->next);
             continue;
@@ -374,6 +376,30 @@ static Token *preprocess2(Token *tok)
             cond_incl->ctx = IN_ELSE;
             tok = skip_line(tok->next);
             if (cond_incl->included)
+            {
+                tok = skip_cond_incl(tok);
+            }
+            continue;
+        }
+
+        if (equal(tok, "ifdef"))
+        {
+            bool defined = find_macro(tok->next);
+            push_cond_incl(tok, defined);
+            tok = skip_line(tok->next->next);
+            if (!defined)
+            {
+                tok = skip_cond_incl(tok);
+            }
+            continue;
+        }
+
+        if (equal(tok, "ifndef"))
+        {
+            bool defined = find_macro(tok->next);
+            push_cond_incl(tok, !defined);
+            tok = skip_line(tok->next->next);
+            if (defined)
             {
                 tok = skip_cond_incl(tok);
             }
