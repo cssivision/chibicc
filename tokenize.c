@@ -5,6 +5,7 @@ static File **input_files;
 
 // True if the current position is at the beginning of a line
 static bool at_bol;
+static bool has_space;
 
 // Reports an error message in the following format and exit.
 //
@@ -74,7 +75,8 @@ Token *new_token(TokenKind kind, char *start, char *end)
     tok->len = end - start;
     tok->at_bol = at_bol;
     tok->file = current_file;
-    at_bol = false;
+    tok->has_space = has_space;
+    at_bol = has_space = false;
     return tok;
 }
 
@@ -482,6 +484,7 @@ Token *tokenize(File *file)
     Token *cur = &head;
 
     at_bol = true;
+    has_space = false;
 
     while (*p)
     {
@@ -493,6 +496,7 @@ Token *tokenize(File *file)
             {
                 p++;
             }
+            has_space = true;
             continue;
         }
 
@@ -505,6 +509,7 @@ Token *tokenize(File *file)
                 error_at(p, "unclosed block comment");
             }
             p = q + 2;
+            has_space = true;
             continue;
         }
 
@@ -513,12 +518,14 @@ Token *tokenize(File *file)
         {
             p++;
             at_bol = true;
+            has_space = true;
             continue;
         }
 
         if (isspace(*p))
         {
             p++;
+            has_space = true;
             continue;
         }
 

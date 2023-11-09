@@ -182,7 +182,7 @@ static Node *new_unary(NodeKind kind, Node *expr, Token *tok)
     return node;
 }
 
-static Token *skip(Token *tok, char *op)
+Token *skip(Token *tok, char *op)
 {
     if (!equal(tok, op))
     {

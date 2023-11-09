@@ -66,6 +66,7 @@ struct Token
 
     int line_no;      // Line number
     bool at_bol;      // True if this token is at beginning of line
+    bool has_space;   // True if this token follows a space character
     Hideset *hideset; // For macro expansion
 };
 
@@ -287,6 +288,7 @@ bool is_numeric(Type *ty);
 bool equal(Token *tok, char *p);
 bool consume(Token **rest, Token *tok, char *str);
 int64_t const_expr(Token **rest, Token *tok);
+Token *skip(Token *tok, char *op);
 
 char *format(char *fmt, ...);
 
