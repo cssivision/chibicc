@@ -632,7 +632,7 @@ char *read_file(char *path)
     return buf;
 }
 
-static File *new_file(char *name, int file_no, char *contents)
+File *new_file(char *name, int file_no, char *contents)
 {
     File *file = calloc(1, sizeof(File));
     file->name = name;

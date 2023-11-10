@@ -293,6 +293,8 @@ Token *skip(Token *tok, char *op);
 char *format(char *fmt, ...);
 
 Token *tokenize_file(char *path);
+Token *tokenize(File *file);
+File *new_file(char *name, int file_no, char *contents);
 Obj *parse(Token *tok);
 void codegen(Obj *prog, FILE *out);
 int align_to(int n, int align);
