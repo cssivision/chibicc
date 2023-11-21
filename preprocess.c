@@ -480,11 +480,11 @@ static Token *new_str_token(char *str, Token *tmpl)
 }
 
 // Concatenates all tokens in `tok` and returns a new string.
-static char *join_tokens(Token *tok)
+static char *join_tokens(Token *tok, Token *end)
 {
     // Compute the length of the resulting token.
     int len = 1;
-    for (Token *t = tok; t && t->kind != TK_EOF; t = t->next)
+    for (Token *t = tok; t != end && t->kind != TK_EOF; t = t->next)
     {
         if (t != tok && t->has_space)
         {
@@ -497,7 +497,7 @@ static char *join_tokens(Token *tok)
 
     // Copy token texts.
     int pos = 0;
-    for (Token *t = tok; t && t->kind != TK_EOF; t = t->next)
+    for (Token *t = tok; t != end && t->kind != TK_EOF; t = t->next)
     {
         if (t != tok && t->has_space)
         {
@@ -517,7 +517,7 @@ static Token *stringize(Token *hash, Token *arg)
     // Create a new string token. We need to set some value to its
     // source location for error reporting function, so we use a macro
     // name token as a template.
-    char *s = join_tokens(arg);
+    char *s = join_tokens(arg, NULL);
     return new_str_token(s, hash);
 }
 
@@ -738,6 +738,57 @@ static void read_macro_definition(Token **rest, Token *tok)
     }
 }
 
+static char *read_include_filename(Token **rest, Token *tok, bool *is_dquote)
+{
+    // Pattern 1: #include "foo.h"
+    if (tok->kind == TK_STR)
+    {
+        *is_dquote = true;
+        *rest = skip_line(tok->next);
+        return strndup(tok->loc + 1, tok->len - 2);
+    }
+    // Pattern 2: #include <foo.h>
+    if (equal(tok, "<"))
+    {
+        // Reconstruct a filename from a sequence of tokens between
+        // "<" and ">".
+        Token *start = tok;
+
+        // Find closing ">".
+        for (; !equal(tok, ">"); tok = tok->next)
+        {
+            if (tok->at_bol || tok->kind == TK_EOF)
+            {
+                error_tok(tok, "expected '>'");
+            }
+        }
+
+        *is_dquote = false;
+        *rest = skip_line(tok->next);
+        return join_tokens(start->next, tok);
+    }
+
+    // Pattern 3: #include FOO
+    // In this case FOO must be macro-expanded to either
+    // a single string token or a sequence of "<" ... ">".
+    if (tok->kind == TK_IDENT)
+    {
+        Token *tok2 = preprocess2(copy_line(rest, tok));
+        return read_include_filename(&tok2, tok2, is_dquote);
+    }
+    error_tok(tok, "expected a filename");
+}
+
+static Token *include_file(Token *tok, char *path, Token *filename_tok)
+{
+    Token *tok2 = tokenize_file(path);
+    if (!tok2)
+    {
+        error_tok(filename_tok, "%s: cannot open file: %s", path, strerror(errno));
+    }
+    return append(tok2, tok);
+}
+
 // Visit all tokens in `tok` while evaluating preprocessing
 // macros and directives.
 static Token *preprocess2(Token *tok)
@@ -766,29 +817,19 @@ static Token *preprocess2(Token *tok)
 
         if (equal(tok, "include"))
         {
-            tok = tok->next;
-
-            if (tok->kind != TK_STR)
+            bool is_dquote;
+            char *filename = read_include_filename(&tok, tok->next, &is_dquote);
+            if (filename[0] != '/')
             {
-                error_tok(tok, "expected a filename");
+                char *path = format("%s/%s", dirname(strdup(start->file->name)), filename);
+                if (file_exists(path))
+                {
+                    tok = include_file(tok, path, start->next->next);
+                    continue;
+                }
             }
-
-            char *path;
-            if (tok->str[0] == '/')
-            {
-                path = tok->str;
-            }
-            else
-            {
-                path = format("%s/%s", dirname(strdup(tok->file->name)), tok->str);
-            }
-            Token *tok2 = tokenize_file(path);
-            if (!tok2)
-            {
-                error_tok(tok, "%s", strerror(errno));
-            }
-            tok = skip_line(tok->next);
-            tok = append(tok2, tok);
+            // TODO: Search a file from the include paths.
+            tok = include_file(tok, filename, start->next->next);
             continue;
         }
 

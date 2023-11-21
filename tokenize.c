@@ -678,7 +678,9 @@ static void remove_backslash_newline(char *p)
     }
 
     for (; n > 0; n--)
+    {
         p[j++] = '\n';
+    }
     p[j] = '\0';
 }
 
