@@ -327,6 +327,8 @@ int main()
 
 #undef foo
 
+    ASSERT(1, __STDC__);
+
     printf("OK\n");
     return 0;
 }
