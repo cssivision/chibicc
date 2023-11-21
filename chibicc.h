@@ -316,3 +316,4 @@ Token *preprocess(Token *tok);
 //
 
 extern char *base_file;
+extern StringArray include_paths;

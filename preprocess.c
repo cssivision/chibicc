@@ -789,6 +789,19 @@ static Token *include_file(Token *tok, char *path, Token *filename_tok)
     return append(tok2, tok);
 }
 
+static char *search_include_paths(char *filename)
+{
+    for (int i = 0; i < include_paths.len; i++)
+    {
+        char *path = format("%s/%s", include_paths.data[i], filename);
+        if (file_exists(path))
+        {
+            return path;
+        }
+    }
+    return NULL;
+}
+
 // Visit all tokens in `tok` while evaluating preprocessing
 // macros and directives.
 static Token *preprocess2(Token *tok)
@@ -828,8 +841,9 @@ static Token *preprocess2(Token *tok)
                     continue;
                 }
             }
-            // TODO: Search a file from the include paths.
-            tok = include_file(tok, filename, start->next->next);
+
+            char *path = search_include_paths(filename);
+            tok = include_file(tok, path ? path : filename, start->next->next);
             continue;
         }
 

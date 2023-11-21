@@ -11,6 +11,7 @@ static char *output_file;
 
 static StringArray input_paths;
 static StringArray tmpfiles;
+StringArray include_paths;
 
 static void usage(int status)
 {
@@ -20,7 +21,16 @@ static void usage(int status)
 
 static bool take_arg(char *arg)
 {
-    return !strcmp(arg, "-o");
+
+    char *x[] = {"-o", "-I"};
+    for (int i = 0; i < sizeof(x) / sizeof(*x); i++)
+    {
+        if (!strcmp(arg, x[i]))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 static void parse_args(int argc, char **argv)
@@ -84,6 +94,12 @@ static void parse_args(int argc, char **argv)
         if (!strcmp(argv[i], "-c"))
         {
             opt_c = true;
+            continue;
+        }
+
+        if (!strncmp(argv[i], "-I", 2))
+        {
+            strarray_push(&include_paths, argv[i] + 2);
             continue;
         }
 
