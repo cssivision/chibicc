@@ -31,6 +31,7 @@ struct MacroParam
     char *name;
 };
 
+typedef Token *macro_handler_fn(Token *);
 typedef struct Macro Macro;
 struct Macro
 {
@@ -40,6 +41,7 @@ struct Macro
     bool is_objlike; // Object-like or function-like
     bool deleted;
     MacroParam *params;
+    macro_handler_fn *handler;
 };
 
 typedef struct MacroArg MacroArg;
@@ -655,10 +657,23 @@ static bool expand_macro(Token **rest, Token *tok)
     {
         return false;
     }
+
+    // Built-in dynamic macro application such as __LINE__
+    if (m->handler)
+    {
+        *rest = m->handler(tok);
+        (*rest)->next = tok->next;
+        return true;
+    }
+
     if (m->is_objlike)
     {
         Hideset *hs = hideset_union(tok->hideset, new_hideset(m->name));
         Token *body = add_hideset(m->body, hs);
+        for (Token *t = body; t->kind != TK_EOF; t = t->next)
+        {
+            t->origin = tok;
+        }
         *rest = append(body, tok->next);
         (*rest)->at_bol = tok->at_bol;
         (*rest)->has_space = tok->has_space;
@@ -685,6 +700,10 @@ static bool expand_macro(Token **rest, Token *tok)
     Hideset *hs = hideset_intersection(tok->hideset, rparen->hideset);
     hs = hideset_union(hs, new_hideset(m->name));
     Token *body = subst(m->body, args);
+    for (Token *t = body; t->kind != TK_EOF; t = t->next)
+    {
+        t->origin = tok;
+    }
     body = add_hideset(body, hs);
     *rest = append(body, tok->next);
     (*rest)->at_bol = macro_token->at_bol;
@@ -971,6 +990,30 @@ static void define_macro(char *name, char *buf)
     add_macro(name, true, tok);
 }
 
+static Token *line_macro(Token *tmpl)
+{
+    while (tmpl->origin)
+    {
+        tmpl = tmpl->origin;
+    }
+    return new_num_token(tmpl->line_no, tmpl);
+}
+
+static Token *file_macro(Token *tmpl)
+{
+    while (tmpl->origin)
+    {
+        tmpl = tmpl->origin;
+    }
+    return new_str_token(tmpl->file->name, tmpl);
+}
+
+static void add_buildin(char *name, macro_handler_fn *handler)
+{
+    Macro *m = add_macro(name, true, NULL);
+    m->handler = handler;
+}
+
 static void init_macros(void)
 {
     // Define predefined macros
@@ -1015,6 +1058,9 @@ static void init_macros(void)
     define_macro("__x86_64__", "1");
     define_macro("linux", "1");
     define_macro("unix", "1");
+
+    add_buildin("__FILE__", file_macro);
+    add_buildin("__LINE__", line_macro);
 }
 
 // Entry point function of the preprocessor.
