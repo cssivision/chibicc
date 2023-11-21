@@ -86,6 +86,7 @@ int atexit(void (*)(void));
 FILE *open_memstream(char **ptr, size_t *sizeloc);
 char *dirname(char *path);
 char *strncpy(char *dest, char *src, long n);
+char *strdup(char *p);
 int stat(char *pathname, struct stat *statbuf);
 char *dirname(char *path);
 """)
