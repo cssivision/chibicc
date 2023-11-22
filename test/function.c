@@ -130,6 +130,11 @@ int param_decay2(int x()) { return x(); }
 
 static int ret10(void) { return 10; }
 
+char *func_fn(void)
+{
+    return __func__;
+}
+
 int main()
 {
     ASSERT(3, ret3());
@@ -205,6 +210,10 @@ int main()
     ASSERT(3, param_decay2(ret3));
 
     ASSERT(10, (1 ? ret10 : (void *)0)());
+
+    ASSERT(5, sizeof(__func__));
+    ASSERT(0, strcmp("main", __func__));
+    ASSERT(0, strcmp("func_fn", func_fn()));
 
     printf("OK\n");
     return 0;
