@@ -41,6 +41,7 @@ struct Macro
     bool is_objlike; // Object-like or function-like
     bool deleted;
     MacroParam *params;
+    bool is_variadic;
     macro_handler_fn *handler;
 };
 
@@ -374,14 +375,22 @@ static Token *add_hideset(Token *tok, Hideset *hs)
     return head.next;
 }
 
-static MacroArg *read_macro_arg_one(Token **rest, Token *tok)
+static MacroArg *read_macro_arg_one(Token **rest, Token *tok, bool read_rest)
 {
     Token head = {};
     Token *cur = &head;
     int level = 0;
 
-    while (level > 0 || (!equal(tok, ",") && !equal(tok, ")")))
+    for (;;)
     {
+        if (level == 0 && equal(tok, ")"))
+        {
+            break;
+        }
+        if (level == 0 && equal(tok, ",") && !read_rest)
+        {
+            break;
+        }
         if (tok->kind == TK_EOF)
         {
             error_tok(tok, "premature end of input");
@@ -406,7 +415,7 @@ static MacroArg *read_macro_arg_one(Token **rest, Token *tok)
     return arg;
 }
 
-static MacroArg *read_macro_args(Token **rest, Token *tok, MacroParam *params)
+static MacroArg *read_macro_args(Token **rest, Token *tok, MacroParam *params, bool is_variadic)
 {
     Token *start = tok;
     tok = tok->next->next;
@@ -421,11 +430,30 @@ static MacroArg *read_macro_args(Token **rest, Token *tok, MacroParam *params)
         {
             tok = skip(tok, ",");
         }
-        cur = cur->next = read_macro_arg_one(&tok, tok);
+        cur = cur->next = read_macro_arg_one(&tok, tok, false);
         cur->name = pp->name;
     }
 
-    if (pp)
+    if (is_variadic)
+    {
+        MacroArg *arg;
+        if (equal(tok, ")"))
+        {
+            arg = calloc(1, sizeof(MacroArg));
+            arg->tok = new_eof(tok);
+        }
+        else
+        {
+            if (pp != params)
+            {
+                tok = skip(tok, ",");
+            }
+            arg = read_macro_arg_one(&tok, tok, true);
+        }
+        arg->name = "__VA_ARGS__";
+        cur = cur->next = arg;
+    }
+    else if (pp)
     {
         error_tok(start, "too many arguments");
     }
@@ -689,7 +717,7 @@ static bool expand_macro(Token **rest, Token *tok)
 
     Token *macro_token = tok;
     // Function-like macro application
-    MacroArg *args = read_macro_args(&tok, tok, m->params);
+    MacroArg *args = read_macro_args(&tok, tok, m->params, m->is_variadic);
     Token *rparen = tok;
 
     // Tokens that consist a func-like macro invocation may have different
@@ -711,7 +739,7 @@ static bool expand_macro(Token **rest, Token *tok)
     return true;
 }
 
-static MacroParam *read_macro_params(Token **rest, Token *tok)
+static MacroParam *read_macro_params(Token **rest, Token *tok, bool *is_variadic)
 {
     MacroParam head = {};
     MacroParam *cur = &head;
@@ -721,6 +749,12 @@ static MacroParam *read_macro_params(Token **rest, Token *tok)
         if (cur != &head)
         {
             tok = skip(tok, ",");
+        }
+        if (equal(tok, "..."))
+        {
+            *is_variadic = true;
+            *rest = skip(tok->next, ")");
+            return head.next;
         }
         if (tok->kind != TK_IDENT)
         {
@@ -746,9 +780,11 @@ static void read_macro_definition(Token **rest, Token *tok)
     if (!tok->has_space && equal(tok, "("))
     {
         // Function-like macro
-        MacroParam *params = read_macro_params(&tok, tok->next);
+        bool is_variadic = false;
+        MacroParam *params = read_macro_params(&tok, tok->next, &is_variadic);
         Macro *m = add_macro(name, false, copy_line(rest, tok));
         m->params = params;
+        m->is_variadic = is_variadic;
     }
     else
     {
