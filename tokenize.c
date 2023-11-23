@@ -546,7 +546,7 @@ Token *tokenize(File *file)
         if (startswith(p, "L'"))
         {
             cur = cur->next = read_char_literal(p, p + 1);
-            p += cur->len;
+            p = cur->loc + cur->len;
             continue;
         }
 

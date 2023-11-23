@@ -256,6 +256,7 @@ struct Type
     Type *next;
 
     Member *members;
+    bool is_flexible;
 };
 
 bool is_integer(Type *ty);

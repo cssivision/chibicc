@@ -145,7 +145,7 @@ Type *find_tag(Token *tag)
     {
         for (TagScope *ts = sc->tags; ts; ts = ts->next)
         {
-            if (strncmp(tag->loc, ts->name, tag->len) == 0)
+            if (equal(tag, ts->name))
             {
                 return ts->ty;
             }
@@ -502,14 +502,10 @@ static Member *get_struct_member(Type *ty, Token *tok)
 
 static Node *struct_ref(Token *tok, Node *lhs)
 {
-    if (tok->kind != TK_IDENT)
-    {
-        error_tok(tok, "expecetd an ident");
-    }
     add_type(lhs);
     if (lhs->ty->kind != TY_STRUCT && lhs->ty->kind != TY_UNION)
     {
-        error_tok(lhs->tok, "not a struct");
+        error_tok(lhs->tok, "not a struct nor a union");
     }
     Node *node = new_unary(ND_MEMBER, lhs, tok);
     node->member = get_struct_member(lhs->ty, tok);
@@ -616,9 +612,8 @@ static Node *postfix(Token **rest, Token *tok)
         {
             // x->y is short for (*x).y
             node = new_unary(ND_DEREF, node, tok);
-            tok = tok->next;
-            node = struct_ref(tok, node);
-            tok = tok->next;
+            node = struct_ref(tok->next, node);
+            tok = tok->next->next;
             continue;
         }
         *rest = tok;
@@ -1336,14 +1331,11 @@ static void struct_members(Token **rest, Token *tok, Type *ty)
                 tok = skip(tok, ",");
             }
             first = false;
-            Type *ty = declarator(&tok, tok, basety);
-            if (!ty->name)
-            {
-                error_tok(ty->name_pos, "variable name omitted");
-            }
+
             Member *mem = calloc(1, sizeof(Member));
-            mem->ty = ty;
-            mem->name = ty->name;
+            mem->ty = declarator(&tok, tok, basety);
+            mem->name = mem->ty->name;
+
             mem->idx = idx++;
             mem->align = attr.align ? attr.align : mem->ty->align;
             cur = cur->next = mem;
@@ -1357,10 +1349,10 @@ static void struct_members(Token **rest, Token *tok, Type *ty)
     if (cur != &head && cur->ty->kind == TY_ARRAY && cur->ty->array_len < 0)
     {
         cur->ty = array_of(cur->ty->base, 0);
+        ty->is_flexible = true;
     }
 
-    tok = tok->next;
-    *rest = tok;
+    *rest = tok->next;
     ty->members = head.next;
 }
 
@@ -1996,12 +1988,25 @@ static Initializer *new_initializer(Type *ty, Obj *var, bool is_flexible)
         init->children = calloc(len, sizeof(Initializer *));
         for (Member *mem = ty->members; mem; mem = mem->next)
         {
-            Initializer *init2 = new_initializer(mem->ty, NULL, false);
-            init2->ty = mem->ty;
-            init2->idx = mem->idx;
-            init2->mem = mem;
-            init2->next = init;
-            init->children[mem->idx] = init2;
+            if (is_flexible && ty->is_flexible && !mem->next)
+            {
+                Initializer *child = calloc(1, sizeof(Initializer));
+                child->is_flexible = true;
+                child->ty = mem->ty;
+                child->idx = mem->idx;
+                child->mem = mem;
+                child->next = init;
+                init->children[mem->idx] = child;
+            }
+            else
+            {
+                Initializer *init2 = new_initializer(mem->ty, NULL, false);
+                init2->ty = mem->ty;
+                init2->idx = mem->idx;
+                init2->mem = mem;
+                init2->next = init;
+                init->children[mem->idx] = init2;
+            }
         }
         return init;
     }
@@ -2042,7 +2047,10 @@ static void array_initializer2(Token **rest, Token *tok, Initializer *init)
     {
         int len = count_array_init_elements(tok, init->ty);
         Type *ty = array_of(init->ty->base, len);
-        init->var->ty = ty;
+        if (init->var)
+        {
+            init->var->ty = ty;
+        }
         *init = *new_initializer(ty, init->var, false);
     }
 
@@ -2067,7 +2075,10 @@ static void array_initializer1(Token **rest, Token *tok, Initializer *init)
     {
         int len = count_array_init_elements(tok, init->ty);
         Type *ty = array_of(init->ty->base, len);
-        init->var->ty = ty;
+        if (init->var)
+        {
+            init->var->ty = ty;
+        }
         *init = *new_initializer(ty, init->var, false);
     }
 
@@ -2228,12 +2239,42 @@ void initializer2(Token **rest, Token *tok, Initializer *init)
     return;
 }
 
+static Type *copy_struct_type(Type *ty)
+{
+    ty = copy_type(ty);
+
+    Member head = {};
+    Member *cur = &head;
+    for (Member *mem = ty->members; mem; mem = mem->next)
+    {
+        Member *m = calloc(1, sizeof(Member));
+        *m = *mem;
+        cur = cur->next = m;
+    }
+
+    ty->members = head.next;
+    return ty;
+}
+
 // initializer = "{" initializer ("," initializer)* "}"
 //              | assign
 static Initializer *initializer(Token **rest, Token *tok, Obj *var)
 {
     Initializer *init = new_initializer(var->ty, var, true);
     initializer2(&tok, tok, init);
+
+    if ((var->ty->kind == TY_STRUCT || var->ty->kind == TY_UNION) && var->ty->is_flexible)
+    {
+        Type *ty = copy_struct_type(var->ty);
+        Member *mem = ty->members;
+        while (mem->next)
+        {
+            mem = mem->next;
+        }
+        mem->ty = init->children[mem->idx]->ty;
+        ty->size += mem->ty->size;
+        var->ty = ty;
+    }
     *rest = tok;
     return init;
 }
