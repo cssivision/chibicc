@@ -301,7 +301,9 @@ static char *find_file(char *pattern)
     glob_t buf = {};
     glob(pattern, 0, NULL, &buf);
     if (buf.gl_pathc > 0)
+    {
         path = strdup(buf.gl_pathv[buf.gl_pathc - 1]);
+    }
     globfree(&buf);
     return path;
 }

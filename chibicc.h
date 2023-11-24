@@ -191,6 +191,7 @@ struct Node
 
     // Function
     Node *args;
+    bool pass_by_stack;
 
     // Switch-cases
     Node *case_next;
