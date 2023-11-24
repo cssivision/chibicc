@@ -953,14 +953,48 @@ void assign_lvar_offsets(Obj *prog)
         {
             continue;
         }
-        int offset = 0;
+
+        // If a function has many parameters, some parameters are
+        // inevitably passed by stack rather than by register.
+        // The first passed-by-stack parameter resides at RBP+16.
+        int top = 16;
+        int gp = 0, fp = 0;
+
+        // Assign offsets to pass-by-stack parameters.
+        for (Obj *var = fn->params; var; var = var->next)
+        {
+            if (is_flonum(var->ty))
+            {
+                if (fp++ < FP_MAX)
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                if (gp++ < GP_MAX)
+                {
+                    continue;
+                }
+            }
+            top = align_to(top, 8);
+            var->offset = top;
+            top += var->ty->size;
+        }
+
+        int bottom = 0;
+        // Assign offsets to pass-by-register parameters and local variables.
         for (Obj *var = fn->locals; var; var = var->next)
         {
-            offset += var->ty->size;
-            offset = align_to(offset, var->align);
-            var->offset = -offset;
+            if (var->offset)
+            {
+                continue;
+            }
+            bottom += var->ty->size;
+            bottom = align_to(bottom, var->align);
+            var->offset = -bottom;
         }
-        fn->stack_size = align_to(offset, 16);
+        fn->stack_size = align_to(bottom, 16);
     }
 }
 
@@ -1109,16 +1143,21 @@ void emit_text(Obj *prog)
         }
 
         // Save passed-by-register arguments to the stack
-        int i = 0;
+        int gp = 0, fp = 0;
         for (Obj *var = fn->params; var; var = var->next)
         {
+            if (var->offset > 0)
+            {
+                continue;
+            }
+
             if (is_flonum(var->ty))
             {
-                store_fp(i++, var->offset, var->ty->size);
+                store_fp(fp++, var->offset, var->ty->size);
             }
             else
             {
-                store_gp(i++, var->offset, var->ty->size);
+                store_gp(gp++, var->offset, var->ty->size);
             }
         }
 
