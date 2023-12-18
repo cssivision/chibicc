@@ -312,11 +312,10 @@ static Node *funccall(Token **rest, Token *tok, Node *fn)
         add_type(arg);
         if (param_ty)
         {
-            if (param_ty->kind == TY_STRUCT || param_ty->kind == TY_UNION)
+            if (param_ty->kind != TY_STRUCT && param_ty->kind != TY_UNION)
             {
-                error_tok(arg->tok, "passing struct or union is not supported yet");
+                arg = new_cast(arg, param_ty);
             }
-            arg = new_cast(arg, param_ty);
             param_ty = param_ty->next;
         }
         else if (arg->ty->kind == TY_FLOAT)
