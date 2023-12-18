@@ -330,6 +330,7 @@ static char *find_gcc_libpath(void)
         "/usr/lib/gcc/x86_64-linux-gnu/*/crtbegin.o",
         "/usr/lib/gcc/x86_64-pc-linux-gnu/*/crtbegin.o", // For Gentoo
         "/usr/lib/gcc/x86_64-redhat-linux/*/crtbegin.o", // For Fedora
+        "/usr/lib/gcc/x86_64-*-linux/*/crtbegin.o"
     };
 
     for (int i = 0; i < sizeof(paths) / sizeof(*paths); i++)
