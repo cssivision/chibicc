@@ -717,9 +717,17 @@ static Node *unary(Token **rest, Token *tok)
 
     if (equal(tok, "*"))
     {
-        Node *node = new_unary(ND_DEREF, cast(&tok, tok->next), tok);
-        *rest = tok;
-        return node;
+        // [https://www.sigbus.info/n1570#6.5.3.2p4] This is an oddity
+        // in the C spec, but dereferencing a function shouldn't do
+        // anything. If foo is a function, `*foo`, `**foo` or `*****foo`
+        // are all equivalent to just `foo`.
+        Node *node = cast(rest, tok->next);
+        add_type(node);
+        if (node->ty->kind == TY_FUNC)
+        {
+            return node;
+        }
+        return new_unary(ND_DEREF, node, tok);
     }
 
     return postfix(rest, tok);
