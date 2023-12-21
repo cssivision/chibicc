@@ -40,6 +40,7 @@ typedef enum
     TK_PUNCT,
     TK_IDENT,
     TK_NUM,
+    TK_PP_NUM, // Preprocessing numbers
     TK_KEYWORD,
     TK_EOF,
     TK_STR // "str"
@@ -303,7 +304,7 @@ File *new_file(char *name, int file_no, char *contents);
 Obj *parse(Token *tok);
 void codegen(Obj *prog, FILE *out);
 int align_to(int n, int align);
-void convert_keywords(Token *tok);
+void convert_pp_tokens(Token *tok);
 File **get_input_files(void);
 
 #define unreachable() \

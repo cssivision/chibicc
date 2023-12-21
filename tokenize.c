@@ -143,13 +143,179 @@ bool is_keywords(Token *tok)
     return false;
 }
 
-void convert_keywords(Token *tok)
+static bool convert_pp_int(Token *tok)
+{
+    char *p = tok->loc;
+    int base = 10;
+    if (!strncasecmp(p, "0x", 2) && isxdigit(p[2]))
+    {
+        p += 2;
+        base = 16;
+    }
+    else if (!strncasecmp(p, "0b", 2) && (p[2] == '0' || p[2] == '1'))
+    {
+        p += 2;
+        base = 2;
+    }
+    else if (*p == '0')
+    {
+        base = 8;
+    }
+
+    int64_t val = strtoul(p, &p, base);
+
+    // Read U, L or LL suffixes.
+    bool l = false;
+    bool u = false;
+
+    if (startswith(p, "LLU") || startswith(p, "LLu") ||
+        startswith(p, "llU") || startswith(p, "llu") ||
+        startswith(p, "ULL") || startswith(p, "Ull") ||
+        startswith(p, "uLL") || startswith(p, "ull"))
+    {
+        p += 3;
+        l = u = true;
+    }
+    else if (!strncasecmp(p, "lu", 2) || !strncasecmp(p, "ul", 2))
+    {
+        p += 2;
+        l = u = true;
+    }
+    else if (startswith(p, "LL") || startswith(p, "ll"))
+    {
+        p += 2;
+        l = true;
+    }
+    else if (*p == 'L' || *p == 'l')
+    {
+        p++;
+        l = true;
+    }
+    else if (*p == 'U' || *p == 'u')
+    {
+        p++;
+        u = true;
+    }
+
+    if (p != tok->loc + tok->len)
+    {
+        return false;
+    }
+
+    // Infer a type.
+    Type *ty;
+    if (base == 10)
+    {
+        if (l && u)
+        {
+            ty = ty_ulong;
+        }
+        else if (l)
+        {
+            ty = ty_long;
+        }
+        else if (u)
+        {
+            ty = (val >> 32) ? ty_ulong : ty_uint;
+        }
+        else
+        {
+            ty = (val >> 31) ? ty_long : ty_int;
+        }
+    }
+    else
+    {
+        if (l && u)
+        {
+            ty = ty_ulong;
+        }
+        else if (l)
+        {
+            ty = (val >> 63) ? ty_ulong : ty_long;
+        }
+        else if (u)
+        {
+            ty = (val >> 32) ? ty_ulong : ty_uint;
+        }
+        else if (val >> 63)
+        {
+            ty = ty_ulong;
+        }
+        else if (val >> 32)
+        {
+            ty = ty_long;
+        }
+        else if (val >> 31)
+        {
+            ty = ty_uint;
+        }
+        else
+        {
+            ty = ty_int;
+        }
+    }
+
+    tok->kind = TK_NUM;
+    tok->val = val;
+    tok->ty = ty;
+    return true;
+}
+
+// The definition of the numeric literal at the preprocessing stage
+// is more relaxed than the definition of that at the later stages.
+// In order to handle that, a numeric literal is tokenized as a
+// "pp-number" token first and then converted to a regular number
+// token after preprocessing.
+//
+// This function converts a pp-number token to a regular number token.
+static void convert_pp_number(Token *tok)
+{
+    if (convert_pp_int(tok))
+    {
+        return;
+    }
+
+    // If it's not an integer, it must be a floating point constant.
+    char *end;
+    double val = strtod(tok->loc, &end);
+
+    Type *ty;
+    if (*end == 'f' || *end == 'F')
+    {
+        ty = ty_float;
+        end++;
+    }
+    else if (*end == 'l' || *end == 'L')
+    {
+        ty = ty_double;
+        end++;
+    }
+    else
+    {
+        ty = ty_double;
+    }
+
+    if (tok->loc + tok->len != end)
+    {
+        error_tok(tok, "invalid numeric constant");
+    }
+
+    tok->kind = TK_NUM;
+    tok->fval = val;
+    tok->ty = ty;
+}
+
+void convert_pp_tokens(Token *tok)
 {
     for (Token *t = tok; t->kind != TK_EOF; t = t->next)
     {
         if (is_keywords(t))
         {
             t->kind = TK_KEYWORD;
+        }
+        else if (t->kind == TK_PP_NUM)
+        {
+            convert_pp_number(t);
         }
     }
 }
@@ -327,154 +493,6 @@ Token *read_char_literal(char *start, char *quote)
     return tok;
 }
 
-static Token *read_int_literal(char *start)
-{
-    char *p = start;
-    int base = 10;
-    if (!strncasecmp(p, "0x", 2) && isxdigit(p[2]))
-    {
-        p += 2;
-        base = 16;
-    }
-    else if (!strncasecmp(p, "0b", 2) && (p[2] == '0' || p[2] == '1'))
-    {
-        p += 2;
-        base = 2;
-    }
-    else if (*p == '0')
-    {
-        base = 8;
-    }
-
-    int64_t val = strtoul(p, &p, base);
-
-    // Read U, L or LL suffixes.
-    bool l = false;
-    bool u = false;
-
-    if (startswith(p, "LLU") || startswith(p, "LLu") ||
-        startswith(p, "llU") || startswith(p, "llu") ||
-        startswith(p, "ULL") || startswith(p, "Ull") ||
-        startswith(p, "uLL") || startswith(p, "ull"))
-    {
-        p += 3;
-        l = u = true;
-    }
-    else if (!strncasecmp(p, "lu", 2) || !strncasecmp(p, "ul", 2))
-    {
-        p += 2;
-        l = u = true;
-    }
-    else if (startswith(p, "LL") || startswith(p, "ll"))
-    {
-        p += 2;
-        l = true;
-    }
-    else if (*p == 'L' || *p == 'l')
-    {
-        p++;
-        l = true;
-    }
-    else if (*p == 'U' || *p == 'u')
-    {
-        p++;
-        u = true;
-    }
-
-    // Infer a type.
-    Type *ty;
-    if (base == 10)
-    {
-        if (l && u)
-        {
-            ty = ty_ulong;
-        }
-        else if (l)
-        {
-            ty = ty_long;
-        }
-        else if (u)
-        {
-            ty = (val >> 32) ? ty_ulong : ty_uint;
-        }
-        else
-        {
-            ty = (val >> 31) ? ty_long : ty_int;
-        }
-    }
-    else
-    {
-        if (l && u)
-        {
-            ty = ty_ulong;
-        }
-        else if (l)
-        {
-            ty = (val >> 63) ? ty_ulong : ty_long;
-        }
-        else if (u)
-        {
-            ty = (val >> 32) ? ty_ulong : ty_uint;
-        }
-        else if (val >> 63)
-        {
-            ty = ty_ulong;
-        }
-        else if (val >> 32)
-        {
-            ty = ty_long;
-        }
-        else if (val >> 31)
-        {
-            ty = ty_uint;
-        }
-        else
-        {
-            ty = ty_int;
-        }
-    }
-
-    Token *tok = new_token(TK_NUM, start, p);
-    tok->val = val;
-    tok->ty = ty;
-    return tok;
-}
-
-static Token *read_number(char *start)
-{
-    // Try to parse as an integer constant.
-    Token *tok = read_int_literal(start);
-    if (!strchr(".eEfF", start[tok->len]))
-    {
-        return tok;
-    }
-
-    // If it's not an integer, it must be a floating point constant.
-    char *end;
-    double val = strtod(start, &end);
-
-    Type *ty;
-    if (*end == 'f' || *end == 'F')
-    {
-        ty = ty_float;
-        end++;
-    }
-    else if (*end == 'l' || *end == 'L')
-    {
-        ty = ty_double;
-        end++;
-    }
-    else
-    {
-        ty = ty_double;
-    }
-
-    tok = new_token(TK_NUM, start, end);
-    tok->fval = val;
-    tok->ty = ty;
-    return tok;
-}
-
 Token *tokenize(File *file)
 {
     current_file = file;
@@ -552,8 +570,23 @@ Token *tokenize(File *file)
 
         if (isdigit(*p) || (*p == '.' && isdigit(p[1])))
         {
-            cur = cur->next = read_number(p);
-            p += cur->len;
+            char *q = p++;
+            for (;;)
+            {
+                if (p[0] && p[1] && strchr("eEpP", p[0]) && strchr("+-", p[1]))
+                {
+                    p += 2;
+                }
+                else if (isalnum(*p) || *p == '.')
+                {
+                    p++;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            cur = cur->next = new_token(TK_PP_NUM, q, p);
             continue;
         }
 
