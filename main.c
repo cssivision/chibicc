@@ -282,8 +282,19 @@ static void cc1(void)
         return;
     }
     Obj *prog = parse(tok);
+
+    // Open a temporary output buffer.
+    char *buf;
+    size_t buflen;
+    FILE *output_buf = open_memstream(&buf, &buflen);
+
+    // Traverse the AST to emit assembly.
+    codegen(prog, output_buf);
+    fclose(output_buf);
+
     FILE *out = open_file(output_file);
-    codegen(prog, out);
+    fwrite(buf, buflen, 1, out);
+    fclose(out);
 }
 
 char *replace_extn(char *tmpl, char *extn)
