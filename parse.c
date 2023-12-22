@@ -2897,6 +2897,27 @@ static void write_buf(char *buf, uint64_t val, int sz)
     }
 }
 
+static uint64_t read_buf(char *buf, int sz)
+{
+    if (sz == 1)
+    {
+        return *buf;
+    }
+    if (sz == 2)
+    {
+        return *(uint16_t *)buf;
+    }
+    if (sz == 4)
+    {
+        return *(uint32_t *)buf;
+    }
+    if (sz == 8)
+    {
+        return *(uint64_t *)buf;
+    }
+    unreachable();
+}
+
 static Relocation *write_gvar_data(Relocation *cur, Initializer *init, char *buf, int offset)
 {
     if (init->ty->kind == TY_ARRAY)
@@ -2913,7 +2934,25 @@ static Relocation *write_gvar_data(Relocation *cur, Initializer *init, char *buf
     {
         for (Member *mem = init->ty->members; mem; mem = mem->next)
         {
-            cur = write_gvar_data(cur, init->children[mem->idx], buf, offset + mem->offset);
+            if (mem->is_bitfield)
+            {
+                Node *expr = init->children[mem->idx]->expr;
+                if (!expr)
+                {
+                    break;
+                }
+
+                char *loc = buf + offset + mem->offset;
+                uint64_t oldval = read_buf(loc, mem->ty->size);
+                uint64_t newval = eval(expr);
+                uint64_t mask = (1L << mem->bit_width) - 1;
+                uint64_t combined = oldval | ((newval & mask) << mem->bit_offset);
+                write_buf(loc, combined, mem->ty->size);
+            }
+            else
+            {
+                cur = write_gvar_data(cur, init->children[mem->idx], buf, offset + mem->offset);
+            }
         }
         return cur;
     }
