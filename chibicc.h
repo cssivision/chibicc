@@ -314,6 +314,8 @@ File **get_input_files(void);
 // preprocess.c
 //
 
+void init_macros(void);
+void define_macro(char *name, char *buf);
 Token *preprocess(Token *tok);
 
 //

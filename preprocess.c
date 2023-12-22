@@ -1023,7 +1023,7 @@ static Token *preprocess2(Token *tok)
     return head.next;
 }
 
-static void define_macro(char *name, char *buf)
+void define_macro(char *name, char *buf)
 {
     Token *tok = tokenize(new_file("<build-in>", 1, buf));
     add_macro(name, true, tok);
@@ -1053,7 +1053,7 @@ static void add_buildin(char *name, macro_handler_fn *handler)
     m->handler = handler;
 }
 
-static void init_macros(void)
+void init_macros(void)
 {
     // Define predefined macros
     define_macro("_LP64", "1");
@@ -1143,7 +1143,6 @@ static void join_adjacent_string_literals(Token *tok1)
 // Entry point function of the preprocessor.
 Token *preprocess(Token *tok)
 {
-    init_macros();
     tok = preprocess2(tok);
     if (cond_incl)
     {

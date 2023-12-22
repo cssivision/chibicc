@@ -45,6 +45,19 @@ static void add_default_include_paths(char *argv0)
     strarray_push(&include_paths, "/usr/include");
 }
 
+static void define(char *str)
+{
+    char *eq = strchr(str, '=');
+    if (eq)
+    {
+        define_macro(strndup(str, eq - str), eq + 1);
+    }
+    else
+    {
+        define_macro(str, "1");
+    }
+}
+
 static void parse_args(int argc, char **argv)
 {
     // Make sure that all command line options that take an argument
@@ -112,6 +125,18 @@ static void parse_args(int argc, char **argv)
         if (!strncmp(argv[i], "-I", 2))
         {
             strarray_push(&include_paths, argv[i] + 2);
+            continue;
+        }
+
+        if (!strcmp(argv[i], "-D"))
+        {
+            define(argv[++i]);
+            continue;
+        }
+
+        if (!strncmp(argv[i], "-D", 2))
+        {
+            define(argv[i] + 2);
             continue;
         }
 
@@ -330,7 +355,7 @@ static char *find_gcc_libpath(void)
         "/usr/lib/gcc/x86_64-linux-gnu/*/crtbegin.o",
         "/usr/lib/gcc/x86_64-pc-linux-gnu/*/crtbegin.o", // For Gentoo
         "/usr/lib/gcc/x86_64-redhat-linux/*/crtbegin.o", // For Fedora
-        "/usr/lib/gcc/x86_64-*-linux/*/crtbegin.o"
+        "/usr/lib/gcc/x86_64-*-linux/*/crtbegin.o",
     };
 
     for (int i = 0; i < sizeof(paths) / sizeof(*paths); i++)
@@ -394,6 +419,7 @@ static void run_linker(StringArray *inputs, char *output)
 int main(int argc, char **argv)
 {
     atexit(cleanup);
+    init_macros();
     parse_args(argc, argv);
 
     if (opt_cc1)
