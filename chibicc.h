@@ -81,6 +81,11 @@ struct Member
     int idx;
     int offset;
     int align;
+
+    // Bitfield
+    bool is_bitfield;
+    int bit_offset;
+    int bit_width;
 };
 
 typedef enum
@@ -304,6 +309,7 @@ File *new_file(char *name, int file_no, char *contents);
 Obj *parse(Token *tok);
 void codegen(Obj *prog, FILE *out);
 int align_to(int n, int align);
+int align_down(int n, int align);
 void convert_pp_tokens(Token *tok);
 File **get_input_files(void);
 
