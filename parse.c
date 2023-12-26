@@ -497,13 +497,25 @@ static Member *get_struct_member(Type *ty, Token *tok)
 {
     for (Member *mem = ty->members; mem; mem = mem->next)
     {
+        // Anonymous struct member
+        if ((mem->ty->kind == TY_STRUCT || mem->ty->kind == TY_UNION) &&
+            !mem->name)
+        {
+            if (get_struct_member(mem->ty, tok))
+            {
+                return mem;
+            }
+            continue;
+        }
+
+        // Regular struct member
         if (mem->name->len == tok->len &&
             !strncmp(mem->name->loc, tok->loc, tok->len))
         {
             return mem;
         }
     }
-    error_tok(tok, "no such member");
+    return NULL;
 }
 
 static Node *struct_ref(Token *tok, Node *lhs)
@@ -513,9 +525,24 @@ static Node *struct_ref(Token *tok, Node *lhs)
     {
         error_tok(lhs->tok, "not a struct nor a union");
     }
-    Node *node = new_unary(ND_MEMBER, lhs, tok);
-    node->member = get_struct_member(lhs->ty, tok);
-    return node;
+
+    Type *ty = lhs->ty;
+    for (;;)
+    {
+        Member *mem = get_struct_member(ty, tok);
+        if (!mem)
+        {
+            error_tok(tok, "no such member");
+        }
+        lhs = new_unary(ND_MEMBER, lhs, tok);
+        lhs->member = mem;
+        if (mem->name)
+        {
+            break;
+        }
+        ty = mem->ty;
+    }
+    return lhs;
 }
 
 // Convert op= operators to expressions containing an assignment.
@@ -1374,6 +1401,20 @@ static void struct_members(Token **rest, Token *tok, Type *ty)
         bool first = true;
         VarAttr attr = {};
         Type *basety = declspec(&tok, tok, &attr);
+
+        // Anonymous struct member
+        if ((basety->kind == TY_STRUCT || basety->kind == TY_UNION) &&
+            consume(&tok, tok, ";"))
+        {
+            Member *mem = calloc(1, sizeof(Member));
+            mem->ty = basety;
+            mem->idx = idx++;
+            mem->align = attr.align ? attr.align : mem->ty->align;
+            cur = cur->next = mem;
+            continue;
+        }
+
+        // Regular struct members
         while (!equal(tok, ";"))
         {
             if (!first)
