@@ -1044,7 +1044,14 @@ static Token *file_macro(Token *tmpl)
     return new_str_token(tmpl->file->name, tmpl);
 }
 
-static void add_buildin(char *name, macro_handler_fn *handler)
+// __COUNTER__ is expanded to serial values starting from 0.
+static Token *counter_macro(Token *tmpl)
+{
+    static int i = 0;
+    return new_num_token(i++, tmpl);
+}
+
+static void add_builtin(char *name, macro_handler_fn *handler)
 {
     Macro *m = add_macro(name, true, NULL);
     m->handler = handler;
@@ -1117,8 +1124,9 @@ void init_macros(void)
     define_macro("linux", "1");
     define_macro("unix", "1");
 
-    add_buildin("__FILE__", file_macro);
-    add_buildin("__LINE__", line_macro);
+    add_builtin("__FILE__", file_macro);
+    add_builtin("__LINE__", line_macro);
+    add_builtin("__COUNTER__", counter_macro);
 
     time_t now = time(NULL);
     struct tm *tm = localtime(&now);
