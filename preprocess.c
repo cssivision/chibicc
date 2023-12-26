@@ -1056,6 +1056,22 @@ void undef_macro(char *name)
     m->deleted = true;
 }
 
+// __DATE__ is expanded to the current date, e.g. "May 17 2020".
+static char *format_date(struct tm *tm)
+{
+    static char mon[][4] = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+    return format("\"%s %2d %d\"", mon[tm->tm_mon], tm->tm_mday, tm->tm_year + 1900);
+}
+
+// __TIME__ is expanded to the current time, e.g. "13:34:03".
+static char *format_time(struct tm *tm)
+{
+    return format("\"%02d:%02d:%02d\"", tm->tm_hour, tm->tm_min, tm->tm_sec);
+}
+
 void init_macros(void)
 {
     // Define predefined macros
@@ -1103,6 +1119,11 @@ void init_macros(void)
 
     add_buildin("__FILE__", file_macro);
     add_buildin("__LINE__", line_macro);
+
+    time_t now = time(NULL);
+    struct tm *tm = localtime(&now);
+    define_macro("__DATE__", format_date(tm));
+    define_macro("__TIME__", format_time(tm));
 }
 
 static void join_adjacent_string_literals(Token *tok1)
