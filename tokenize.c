@@ -472,14 +472,14 @@ Token *read_char_literal(char *start, char *quote)
         error_at(start, "unclosed char literal");
     }
 
-    char c;
+    int c;
     if (*p == '\\')
     {
         c = read_escaped_char(&p, p + 1);
     }
     else
     {
-        c = *p++;
+        c = decode_utf8(&p, p);
     }
 
     char *end = strchr(p, '\'');
@@ -557,6 +557,7 @@ Token *tokenize(File *file)
         if (*p == '\'')
         {
             cur = cur->next = read_char_literal(p, p);
+            cur->val = (char)cur->val;
             p += cur->len;
             continue;
         }

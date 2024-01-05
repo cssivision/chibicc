@@ -292,6 +292,7 @@ extern Type *ty_double;
 
 void error(char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
+void error_at(char *loc, char *fmt, ...);
 void warn_tok(Token *tok, char *fmt, ...);
 bool is_flonum(Type *ty);
 bool is_numeric(Type *ty);
@@ -331,6 +332,7 @@ Token *preprocess(Token *tok);
 //
 
 int encode_utf8(char *buf, uint32_t c);
+uint32_t decode_utf8(char **new_pos, char *p);
 
 //
 // main.c
