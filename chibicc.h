@@ -327,6 +327,12 @@ void undef_macro(char *name);
 Token *preprocess(Token *tok);
 
 //
+// unicode.c
+//
+
+int encode_utf8(char *buf, uint32_t c);
+
+//
 // main.c
 //
 
