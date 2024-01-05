@@ -571,6 +571,14 @@ Token *tokenize(File *file)
             continue;
         }
 
+        // UTF-32 character literal
+        if (startswith(p, "U'"))
+        {
+            cur = cur->next = read_char_literal(p, p + 1, ty_uint);
+            p += cur->len;
+            continue;
+        }
+
         // Wide character literal
         if (startswith(p, "L'"))
         {
