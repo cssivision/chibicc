@@ -464,7 +464,7 @@ static void add_line_numbers(Token *tok)
     } while (*p++);
 }
 
-Token *read_char_literal(char *start, char *quote)
+Token *read_char_literal(char *start, char *quote, Type *ty)
 {
     char *p = quote + 1;
     if (*p == '\0')
@@ -489,7 +489,7 @@ Token *read_char_literal(char *start, char *quote)
     }
     Token *tok = new_token(TK_NUM, start, end + 1);
     tok->val = c;
-    tok->ty = ty_int;
+    tok->ty = ty;
     return tok;
 }
 
@@ -556,15 +556,25 @@ Token *tokenize(File *file)
 
         if (*p == '\'')
         {
-            cur = cur->next = read_char_literal(p, p);
+            cur = cur->next = read_char_literal(p, p, ty_int);
             cur->val = (char)cur->val;
             p += cur->len;
             continue;
         }
 
+        // UTF-16 character literal
+        if (startswith(p, "u'"))
+        {
+            cur = cur->next = read_char_literal(p, p + 1, ty_ushort);
+            cur->val &= 0xffff;
+            p += cur->len;
+            continue;
+        }
+
+        // Wide character literal
         if (startswith(p, "L'"))
         {
-            cur = cur->next = read_char_literal(p, p + 1);
+            cur = cur->next = read_char_literal(p, p + 1, ty_int);
             p = cur->loc + cur->len;
             continue;
         }
