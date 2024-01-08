@@ -314,6 +314,7 @@ int align_to(int n, int align);
 int align_down(int n, int align);
 void convert_pp_tokens(Token *tok);
 File **get_input_files(void);
+Token *tokenize_string_literal(Token *tok, Type *basety);
 
 #define unreachable() \
     error("internal error at %s:%d", __FILE__, __LINE__)

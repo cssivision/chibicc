@@ -815,6 +815,21 @@ File **get_input_files(void)
     return input_files;
 }
 
+Token *tokenize_string_literal(Token *tok, Type *basety)
+{
+    Token *t;
+    if (basety->size == 2)
+    {
+        t = read_utf16_string_literal(tok->loc, tok->loc);
+    }
+    else
+    {
+        t = read_utf32_string_literal(tok->loc, tok->loc, basety);
+    }
+    t->next = tok->next;
+    return t;
+}
+
 // Removes backslashes followed by a newline.
 static void remove_backslash_newline(char *p)
 {
