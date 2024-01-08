@@ -112,14 +112,25 @@ int read_punct(char *p)
     return ispunct(*p) ? 1 : 0;
 }
 
-bool is_ident1(char c)
+static int read_ident(char *start)
 {
-    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_';
-}
+    char *p = start;
+    uint32_t c = decode_utf8(&p, p);
+    if (!is_ident1(c))
+    {
+        return 0;
+    }
 
-bool is_ident2(char c)
-{
-    return is_ident1(c) || ('0' <= c && c <= '9');
+    for (;;)
+    {
+        char *q;
+        c = decode_utf8(&q, p);
+        if (!is_ident2(c))
+        {
+            return p - start;
+        }
+        p = q;
+    }
 }
 
 bool is_keywords(Token *tok)
@@ -712,14 +723,11 @@ Token *tokenize(File *file)
         }
 
         // Identifier or keyword
-        if (is_ident1(*p))
+        int ident_len = read_ident(p);
+        if (ident_len)
         {
-            char *start = p;
-            do
-            {
-                p++;
-            } while (is_ident2(*p));
-            cur = cur->next = new_token(TK_IDENT, start, p);
+            cur = cur->next = new_token(TK_IDENT, p, p + ident_len);
+            p += cur->len;
             continue;
         }
 
