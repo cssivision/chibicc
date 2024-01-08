@@ -648,6 +648,14 @@ Token *tokenize(File *file)
             continue;
         }
 
+        // Wide string literal
+        if (startswith(p, "L\""))
+        {
+            cur = cur->next = read_utf32_string_literal(p, p + 1, ty_int);
+            p += cur->len;
+            continue;
+        }
+
         if (*p == '\'')
         {
             cur = cur->next = read_char_literal(p, p, ty_int);
