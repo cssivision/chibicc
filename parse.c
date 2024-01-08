@@ -2229,9 +2229,37 @@ static void string_initializer(Token **rest, Token *tok, Initializer *init)
     }
 
     int len = MIN(init->ty->array_len, tok->ty->array_len);
-    for (int i = 0; i < len; i++)
+    switch (init->ty->base->size)
     {
-        init->children[i]->expr = new_num(tok->str[i], tok);
+    case 1:
+    {
+        char *str = tok->str;
+        for (int i = 0; i < len; i++)
+        {
+            init->children[i]->expr = new_num(str[i], tok);
+        }
+        break;
+    }
+    case 2:
+    {
+        uint16_t *str = (uint16_t *)tok->str;
+        for (int i = 0; i < len; i++)
+        {
+            init->children[i]->expr = new_num(str[i], tok);
+        }
+        break;
+    }
+    case 4:
+    {
+        uint32_t *str = (uint32_t *)tok->str;
+        for (int i = 0; i < len; i++)
+        {
+            init->children[i]->expr = new_num(str[i], tok);
+        }
+        break;
+    }
+    default:
+        unreachable();
     }
     *rest = tok->next;
     return;
