@@ -278,7 +278,7 @@ static void print_tokens(Token *tok)
         {
             fprintf(out, " ");
         }
-        fprintf(out, " %.*s", tok->len, tok->loc);
+        fprintf(out, "%.*s", tok->len, tok->loc);
         line++;
     }
     fprintf(out, "\n");
