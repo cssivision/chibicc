@@ -53,6 +53,7 @@ static Type *typename(Token **rest, Token *tok);
 static char *get_ident(Token *tok);
 int64_t const_expr(Token **rest, Token *tok);
 static Node *conditional(Token **rest, Token *tok);
+static void designation(Token **rest, Token *tok, Initializer *init);
 static void gvar_initializer(Token **rest, Token *tok, Obj *var);
 static Node *lvar_initializer(Token **rest, Token *tok, Obj *var);
 void initializer2(Token **rest, Token *tok, Initializer *init);
@@ -2145,18 +2146,35 @@ static Token *skip_excess_element(Token *tok)
 
 static int count_array_init_elements(Token *tok, Type *ty)
 {
+    bool first = true;
     Initializer *dummy = new_initializer(ty->base, NULL, false);
-    int i = 0;
+    int i = 0, max = 0;
 
-    for (; !consume_end(&tok, tok); i++)
+    while (!consume_end(&tok, tok))
     {
-        if (i > 0)
+        if (!first)
         {
             tok = skip(tok, ",");
         }
-        initializer2(&tok, tok, dummy);
+        first = false;
+        if (equal(tok, "["))
+        {
+            i = const_expr(&tok, tok->next);
+            if (equal(tok, "..."))
+            {
+                i = const_expr(&tok, tok->next);
+            }
+            tok = skip(tok, "]");
+            designation(&tok, tok, dummy);
+        }
+        else
+        {
+            initializer2(&tok, tok, dummy);
+        }
+        i++;
+        max = MAX(max, i);
     }
-    return i;
+    return max;
 }
 
 // array-initializer2 = initializer ("," initializer)*
