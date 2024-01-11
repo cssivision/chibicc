@@ -57,6 +57,7 @@ static void designation(Token **rest, Token *tok, Initializer *init);
 static void gvar_initializer(Token **rest, Token *tok, Obj *var);
 static Node *lvar_initializer(Token **rest, Token *tok, Obj *var);
 void initializer2(Token **rest, Token *tok, Initializer *init);
+static void struct_initializer2(Token **rest, Token *tok, Initializer *init, Member *mem);
 static Type *pointers(Token **rest, Token *tok, Type *ty);
 static int64_t eval2(Node *node, char **label);
 static int64_t eval_rval(Node *node, char **label);
@@ -2198,7 +2199,7 @@ static void array_initializer2(Token **rest, Token *tok, Initializer *init, int 
         {
             tok = skip(tok, ",");
         }
-        if (equal(tok, "["))
+        if (equal(tok, "[") || equal(tok, "."))
         {
             *rest = start;
             return;
@@ -2240,7 +2241,27 @@ static int array_designator(Token **rest, Token *tok, Type *ty)
     return i;
 }
 
-// designation = ("[" const-expr "]")* "="? initializer
+// struct-designator = "." ident
+static Member *struct_designator(Token **rest, Token *tok, Type *ty)
+{
+    tok = tok->next;
+    if (tok->kind != TK_IDENT)
+    {
+        error_tok(tok, "expected a field designator");
+    }
+
+    for (Member *mem = ty->members; mem; mem = mem->next)
+    {
+        if (mem->name->len == tok->len && !strncmp(mem->name->loc, tok->loc, tok->len))
+        {
+            *rest = tok->next;
+            return mem;
+        }
+    }
+    error_tok(tok, "struct has no such member");
+}
+
+// designation = ("[" const-expr "]" | "." ident)* "="? initializer
 static void designation(Token **rest, Token *tok, Initializer *init)
 {
     if (equal(tok, "["))
@@ -2252,6 +2273,19 @@ static void designation(Token **rest, Token *tok, Initializer *init)
         int i = array_designator(&tok, tok, init->ty);
         designation(&tok, tok, init->children[i]);
         array_initializer2(rest, tok, init, i + 1);
+        return;
+    }
+
+    if (equal(tok, "."))
+    {
+        if (init->ty->kind != TY_STRUCT)
+        {
+            error_tok(tok, "field name not in struct or union initializer");
+        }
+        Member *mem = struct_designator(&tok, tok, init->ty);
+        designation(&tok, tok, init->children[mem->idx]);
+        init->expr = NULL;
+        struct_initializer2(rest, tok, init, mem->next);
         return;
     }
 
@@ -2357,14 +2391,23 @@ static void struct_initializer1(Token **rest, Token *tok, Initializer *init)
 {
     tok = skip(tok, "{");
 
-    int i = 0;
     Member *mem = init->ty->members;
+    bool first = true;
     while (!consume_end(rest, tok))
     {
-        if (i++ > 0)
+        if (!first)
         {
             tok = skip(tok, ",");
         }
+        first = false;
+
+        if (equal(tok, "."))
+        {
+            mem = struct_designator(&tok, tok, init->ty);
+            designation(&tok, tok, init->children[mem->idx]);
+            continue;
+        }
+
         if (mem)
         {
             initializer2(&tok, tok, init->children[mem->idx]);
@@ -2379,15 +2422,22 @@ static void struct_initializer1(Token **rest, Token *tok, Initializer *init)
 }
 
 // struct-initializer2 =  initializer ("," initializer)*
-static void struct_initializer2(Token **rest, Token *tok, Initializer *init)
+static void struct_initializer2(Token **rest, Token *tok, Initializer *init, Member *mem)
 {
-    int i = 0;
-
-    for (Member *mem = init->ty->members; mem && !is_end(tok); mem = mem->next)
+    bool first = true;
+    for (; mem && !is_end(tok); mem = mem->next)
     {
-        if (i++ > 0)
+        Token *start = tok;
+        if (!first)
         {
             tok = skip(tok, ",");
+        }
+        first = false;
+
+        if (equal(tok, "[") || equal(tok, "."))
+        {
+            *rest = start;
+            return;
         }
         initializer2(&tok, tok, init->children[mem->idx]);
     }
@@ -2449,7 +2499,7 @@ void initializer2(Token **rest, Token *tok, Initializer *init)
             init->expr = expr;
             return;
         }
-        struct_initializer2(rest, tok, init);
+        struct_initializer2(rest, tok, init, init->ty->members);
         return;
     }
 
