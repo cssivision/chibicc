@@ -375,6 +375,7 @@ int main()
 
     ASSERT(11, strlen(__DATE__));
     ASSERT(8, strlen(__TIME__));
+    ASSERT(24, strlen(__TIMESTAMP__));
 
     printf("OK\n");
     return 0;
