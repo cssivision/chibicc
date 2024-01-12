@@ -2248,6 +2248,7 @@ static int array_designator(Token **rest, Token *tok, Type *ty)
 // struct-designator = "." ident
 static Member *struct_designator(Token **rest, Token *tok, Type *ty)
 {
+    Token *start = tok;
     tok = tok->next;
     if (tok->kind != TK_IDENT)
     {
@@ -2256,6 +2257,18 @@ static Member *struct_designator(Token **rest, Token *tok, Type *ty)
 
     for (Member *mem = ty->members; mem; mem = mem->next)
     {
+        // Anonymous struct member
+        if (mem->ty->kind == TY_STRUCT && !mem->name)
+        {
+            if (get_struct_member(mem->ty, tok))
+            {
+                *rest = start;
+                return mem;
+            }
+            continue;
+        }
+
+        // Regular struct member
         if (mem->name->len == tok->len && !strncmp(mem->name->loc, tok->loc, tok->len))
         {
             *rest = tok->next;
@@ -2282,11 +2295,10 @@ static void designation(Token **rest, Token *tok, Initializer *init)
 
     if (equal(tok, ".") && init->ty->kind == TY_STRUCT)
     {
-
         Member *mem = struct_designator(&tok, tok, init->ty);
+        designation(&tok, tok, init->children[mem->idx]);
         // designation may reassign value, so we should rest it.
         init->expr = NULL;
-        designation(&tok, tok, init->children[mem->idx]);
         struct_initializer2(rest, tok, init, mem->next);
         return;
     }
@@ -2420,6 +2432,7 @@ static void struct_initializer1(Token **rest, Token *tok, Initializer *init)
         {
             mem = struct_designator(&tok, tok, init->ty);
             designation(&tok, tok, init->children[mem->idx]);
+            mem = mem->next;
             continue;
         }
 
