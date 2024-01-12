@@ -32,7 +32,7 @@ struct Initializer
     Type *ty;
     bool is_flexible;
     Obj *var;
-    Member *mem;
+
     int idx;
 
     // If it's not an aggregate type and has an initializer,
@@ -42,6 +42,10 @@ struct Initializer
     // If it's an initializer for an aggregate type (e.g. array or struct),
     // `children` has initializers for its children.
     Initializer **children;
+
+    // Only one member can be initialized for a union.
+    // `mem` is used to clarify which member is initialized.
+    Member *mem;
 };
 
 static Node *new_add(Node *lhs, Node *rhs, Token *tok);
@@ -2276,17 +2280,28 @@ static void designation(Token **rest, Token *tok, Initializer *init)
         return;
     }
 
-    if (equal(tok, "."))
+    if (equal(tok, ".") && init->ty->kind == TY_STRUCT)
     {
-        if (init->ty->kind != TY_STRUCT)
-        {
-            error_tok(tok, "field name not in struct or union initializer");
-        }
+
         Member *mem = struct_designator(&tok, tok, init->ty);
-        designation(&tok, tok, init->children[mem->idx]);
+        // designation may reassign value, so we should rest it.
         init->expr = NULL;
+        designation(&tok, tok, init->children[mem->idx]);
         struct_initializer2(rest, tok, init, mem->next);
         return;
+    }
+
+    if (equal(tok, ".") && init->ty->kind == TY_UNION)
+    {
+        Member *mem = struct_designator(&tok, tok, init->ty);
+        init->mem = mem;
+        designation(&tok, tok, init->children[mem->idx]);
+        return;
+    }
+
+    if (equal(tok, "."))
+    {
+        error_tok(tok, "field name not in struct or union initializer");
     }
 
     if (equal(tok, "="))
@@ -2447,6 +2462,18 @@ static void struct_initializer2(Token **rest, Token *tok, Initializer *init, Mem
 
 static void union_initializer(Token **rest, Token *tok, Initializer *init)
 {
+    // Unlike structs, union initializers take only one initializer,
+    // and that initializes the first union member by default.
+    // You can initialize other member using a designated initializer.
+    if (equal(tok, "{") && equal(tok->next, "."))
+    {
+        Member *mem = struct_designator(&tok, tok->next, init->ty);
+        init->mem = mem;
+        designation(&tok, tok, init->children[mem->idx]);
+        *rest = skip(tok, "}");
+        return;
+    }
+
     if (equal(tok, "{"))
     {
         initializer2(&tok, tok->next, init->children[0]);
@@ -2606,7 +2633,8 @@ static Node *create_lvar_init(Initializer *init, Token *tok)
 
     if (init->ty->kind == TY_UNION)
     {
-        return create_lvar_init(init->children[0], tok);
+        Member *mem = init->mem ? init->mem : init->ty->members;
+        return create_lvar_init(init->children[mem->idx], tok);
     }
 
     if (!init->expr)
@@ -3208,7 +3236,8 @@ static Relocation *write_gvar_data(Relocation *cur, Initializer *init, char *buf
 
     if (init->ty->kind == TY_UNION)
     {
-        cur = write_gvar_data(cur, init->children[0], buf, offset);
+        Member *mem = init->mem ? init->mem : init->ty->members;
+        cur = write_gvar_data(cur, init->children[mem->idx], buf, offset);
         return cur;
     }
 
