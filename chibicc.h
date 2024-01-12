@@ -52,6 +52,10 @@ typedef struct
     char *name;
     int file_no;
     char *contents;
+
+    // For #line directive
+    char *display_name;
+    int line_delta;
 } File;
 
 struct Token
@@ -66,7 +70,9 @@ struct Token
     char *str;
     File *file;
 
+    char *filename;   // Filename
     int line_no;      // Line number
+    int line_delta;   // Line number
     bool at_bol;      // True if this token is at beginning of line
     bool has_space;   // True if this token follows a space character
     Hideset *hideset; // For macro expansion

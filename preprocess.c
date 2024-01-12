@@ -860,6 +860,31 @@ static char *search_include_paths(char *filename)
     return NULL;
 }
 
+// Read #line arguments
+static void read_line_marker(Token **rest, Token *tok)
+{
+    Token *start = tok;
+    tok = preprocess(copy_line(rest, tok));
+
+    if (tok->kind != TK_NUM || tok->ty->kind != TY_INT)
+    {
+        error_tok(tok, "invalid line marker");
+    }
+    start->file->line_delta = tok->val - start->line_no;
+
+    tok = tok->next;
+    if (tok->kind == TK_EOF)
+    {
+        return;
+    }
+
+    if (tok->kind != TK_STR)
+    {
+        error_tok(tok, "filename expected");
+    }
+    start->file->display_name = tok->str;
+}
+
 // Visit all tokens in `tok` while evaluating preprocessing
 // macros and directives.
 static Token *preprocess2(Token *tok)
@@ -878,6 +903,9 @@ static Token *preprocess2(Token *tok)
         // Pass through if it is not a "#".
         if (!is_hash(tok))
         {
+            tok->line_delta = tok->file->line_delta;
+            tok->filename = tok->file->display_name;
+
             cur = cur->next = tok;
             tok = tok->next;
             continue;
@@ -1003,6 +1031,12 @@ static Token *preprocess2(Token *tok)
             continue;
         }
 
+        if (equal(tok, "line"))
+        {
+            read_line_marker(&tok, tok->next);
+            continue;
+        }
+
         if (equal(tok, "error"))
         {
             error_tok(tok, "error");
@@ -1032,7 +1066,8 @@ static Token *line_macro(Token *tmpl)
     {
         tmpl = tmpl->origin;
     }
-    return new_num_token(tmpl->line_no, tmpl);
+    int i = tmpl->line_no + tmpl->file->line_delta;
+    return new_num_token(i, tmpl);
 }
 
 static Token *file_macro(Token *tmpl)
@@ -1041,7 +1076,7 @@ static Token *file_macro(Token *tmpl)
     {
         tmpl = tmpl->origin;
     }
-    return new_str_token(tmpl->file->name, tmpl);
+    return new_str_token(tmpl->file->display_name, tmpl);
 }
 
 // __COUNTER__ is expanded to serial values starting from 0.
@@ -1260,5 +1295,10 @@ Token *preprocess(Token *tok)
     }
     convert_pp_tokens(tok);
     join_adjacent_string_literals(tok);
+
+    for (Token *t = tok; t; t = t->next)
+    {
+        t->line_no += t->line_delta;
+    }
     return tok;
 }

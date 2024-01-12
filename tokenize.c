@@ -75,6 +75,7 @@ Token *new_token(TokenKind kind, char *start, char *end)
     tok->len = end - start;
     tok->at_bol = at_bol;
     tok->file = current_file;
+    tok->filename = current_file->display_name;
     tok->has_space = has_space;
     at_bol = has_space = false;
     return tok;
@@ -807,6 +808,7 @@ File *new_file(char *name, int file_no, char *contents)
     file->name = name;
     file->file_no = file_no;
     file->contents = contents;
+    file->display_name = name;
     return file;
 }
 
