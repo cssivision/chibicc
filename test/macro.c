@@ -376,6 +376,20 @@ int main()
     ASSERT(11, strlen(__DATE__));
     ASSERT(8, strlen(__TIME__));
     ASSERT(24, strlen(__TIMESTAMP__));
+    ASSERT(0, strcmp(__BASE_FILE__, "test/macro.c"));
+
+#define M30(buf, fmt, ...) sprintf(buf, fmt __VA_OPT__(, ) __VA_ARGS__)
+    ASSERT(0, ({ char buf[100]; M30(buf, "foo"); strcmp(buf, "foo"); }));
+    ASSERT(0, ({ char buf[100]; M30(buf, "foo%d", 3); strcmp(buf, "foo3"); }));
+    ASSERT(0, ({ char buf[100]; M30(buf, "foo%d%d", 3, 5); strcmp(buf, "foo35"); }));
+
+#define M31(buf, fmt, ...) sprintf(buf, fmt, ##__VA_ARGS__)
+    ASSERT(0, ({ char buf[100]; M31(buf, "foo"); strcmp(buf, "foo"); }));
+    ASSERT(0, ({ char buf[100]; M31(buf, "foo%d", 3); strcmp(buf, "foo3"); }));
+    ASSERT(0, ({ char buf[100]; M31(buf, "foo%d%d", 3, 5); strcmp(buf, "foo35"); }));
+
+#define M31(x, y) (1, ##x y)
+    ASSERT(3, M31(, 3));
 
     printf("OK\n");
     return 0;

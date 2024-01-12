@@ -569,6 +569,18 @@ static Token *paste(Token *lhs, Token *rhs)
     return tok;
 }
 
+static bool has_varargs(MacroArg *args)
+{
+    for (MacroArg *ap = args; ap; ap = ap->next)
+    {
+        if (!strcmp(ap->name, "__VA_ARGS__"))
+        {
+            return ap->tok->kind != TK_EOF;
+        }
+    }
+    return false;
+}
+
 // Replace func-like macro parameters with given arguments.
 static Token *subst(Token *tok, MacroArg *args)
 {
@@ -619,6 +631,27 @@ static Token *subst(Token *tok, MacroArg *args)
             continue;
         }
 
+        // [GNU] If __VA_ARG__ is empty, `,##__VA_ARGS__` is expanded
+        // to the empty token list. Otherwise, its expaned to `,` and
+        // __VA_ARGS__.
+        if (equal(tok, ",") && equal(tok->next, "##"))
+        {
+            MacroArg *arg = find_arg(args, tok->next->next);
+            if (arg && !strcmp(arg->name, "__VA_ARGS__"))
+            {
+                if (arg->tok->kind == TK_EOF)
+                {
+                    tok = tok->next->next->next;
+                }
+                else
+                {
+                    cur = cur->next = copy_token(tok);
+                    tok = tok->next->next;
+                }
+                continue;
+            }
+        }
+
         MacroArg *arg = find_arg(args, tok);
         if (arg && equal(tok->next, "##"))
         {
@@ -646,6 +679,22 @@ static Token *subst(Token *tok, MacroArg *args)
                 cur = cur->next = copy_token(t);
             }
             tok = tok->next;
+            continue;
+        }
+
+        // If __VA_ARG__ is empty, __VA_OPT__(x) is expanded to the
+        // empty token list. Otherwise, __VA_OPT__(x) is expanded to x.
+        if (equal(tok, "__VA_OPT__") && equal(tok->next, "("))
+        {
+            MacroArg *arg = read_macro_arg_one(&tok, tok->next->next, true);
+            if (has_varargs(args))
+            {
+                for (Token *t = arg->tok; t->kind != TK_EOF; t = t->next)
+                {
+                    cur = cur->next = t;
+                }
+            }
+            tok = skip(tok, ")");
             continue;
         }
 
@@ -1121,6 +1170,11 @@ static Token *timestamp_macro(Token *tmpl)
     return new_str_token(buf, tmpl);
 }
 
+static Token *base_file_macro(Token *tmpl)
+{
+    return new_str_token(base_file, tmpl);
+}
+
 // __DATE__ is expanded to the current date, e.g. "May 17 2020".
 static char *format_date(struct tm *tm)
 {
@@ -1188,6 +1242,7 @@ void init_macros(void)
     add_builtin("__LINE__", line_macro);
     add_builtin("__COUNTER__", counter_macro);
     add_builtin("__TIMESTAMP__", timestamp_macro);
+    add_builtin("__BASE_FILE__", base_file_macro);
 
     time_t now = time(NULL);
     struct tm *tm = localtime(&now);
