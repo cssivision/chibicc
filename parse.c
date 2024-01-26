@@ -1356,7 +1356,7 @@ int64_t const_expr(Token **rest, Token *tok)
     return eval(node);
 }
 
-// conditional = logor ("?" expr ":" conditional)?
+// conditional = logor ("?" expr? ":" conditional)?
 static Node *conditional(Token **rest, Token *tok)
 {
     Node *cond = logor(&tok, tok);
@@ -1364,6 +1364,19 @@ static Node *conditional(Token **rest, Token *tok)
     {
         *rest = tok;
         return cond;
+    }
+
+    if (equal(tok->next, ":"))
+    {
+        // [GNU] Compile `a ?: b` as `tmp = a, tmp ? tmp : b`.
+        add_type(cond);
+        Obj *var = new_lvar("", cond->ty);
+        Node *lhs = new_binary(ND_ASSIGN, new_var_node(var, tok), cond, tok);
+        Node *rhs = new_node(ND_COND, tok);
+        rhs->cond = new_var_node(var, tok);
+        rhs->then = new_var_node(var, tok);
+        rhs->els = conditional(rest, tok->next->next);
+        return new_binary(ND_COMMA, lhs, rhs, tok);
     }
 
     Node *node = new_node(ND_COND, tok);
