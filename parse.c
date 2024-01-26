@@ -2860,6 +2860,27 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr)
     return node;
 }
 
+// asm-stmt = "asm" ("volatile" | "inline")* "(" string-literal ")"
+static Node *asm_stmt(Token **rest, Token *tok)
+{
+    Node *node = new_node(ND_ASM, tok);
+    tok = tok->next;
+
+    while (equal(tok, "volatile") || equal(tok, "inline"))
+    {
+        tok = tok->next;
+    }
+
+    tok = skip(tok, "(");
+    if (tok->kind != TK_STR || tok->ty->base->kind != TY_CHAR)
+    {
+        error_tok(tok, "expected string literal");
+    }
+    node->asm_str = tok->str;
+    *rest = skip(tok->next, ")");
+    return node;
+}
+
 // stmt = "return" expr? ";"
 //      | expr-stmt
 //      | "{" compound-stmt
@@ -2873,6 +2894,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr)
 //      | goto ident ";"
 //      | break ";"
 //      | ident ":" stmt
+//      | "asm" asm-stmt
 static Node *stmt(Token **rest, Token *tok)
 {
     if (equal(tok, "switch"))
@@ -3097,6 +3119,11 @@ static Node *stmt(Token **rest, Token *tok)
         Node *node = compound_stmt(&tok, tok->next);
         *rest = tok;
         return node;
+    }
+
+    if (equal(tok, "asm"))
+    {
+        return asm_stmt(rest, tok);
     }
     return expr_stmt(rest, tok);
 }

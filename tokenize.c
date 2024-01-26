@@ -144,7 +144,7 @@ bool is_keywords(Token *tok)
                          "_Alignof", "_Alignas", "do", "signed",
                          "const", "volatile", "auto", "register",
                          "restrict", "__restrict", "__restrict__",
-                         "_Noreturn", "float", "double", "typeof"};
+                         "_Noreturn", "float", "double", "typeof", "asm"};
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
         if (equal(tok, kw[i]))

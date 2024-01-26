@@ -1286,6 +1286,9 @@ void gen_stmt(Node *node)
         }
         println("  jmp .L.return.%s", current_fn->name);
         return;
+    case ND_ASM:
+        println("  %s", node->asm_str);
+        return;
     }
 
     error_tok(node->tok, "invalid statement");

@@ -125,6 +125,7 @@ typedef enum
     ND_FUNCCALL, // Function call
     ND_COMMA,    // ,
     ND_MEMBER,   // .
+    ND_ASM,      // "asm"
     ND_CAST,     // type cast
     ND_MEMZERO,  // Zero-clear a stack variable
 
@@ -210,6 +211,9 @@ struct Node
     // Switch-cases
     Node *case_next;
     Node *default_case;
+
+    // "asm" string literal
+    char *asm_str;
 
     // Variable
     Obj *var;
