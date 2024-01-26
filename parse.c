@@ -374,6 +374,7 @@ static Obj *new_string_literal(char *str, Type *ty)
 //          | ident
 //          | num
 //          | sizeof unary
+//          | "__builtin_types_compatible_p" "(" type-name, type-name, ")"
 //          | "_Alignof" "(" type-name ")"
 //          | "_Alignof" unary
 //          | sizeof "(" type-name ")"
@@ -455,6 +456,16 @@ static Node *primary(Token **rest, Token *tok)
         node->ty = tok->ty;
         *rest = tok->next;
         return node;
+    }
+
+    if (equal(tok, "__builtin_types_compatible_p"))
+    {
+        tok = skip(tok->next, "(");
+        Type *t1 = typename(&tok, tok);
+        tok = skip(tok, ",");
+        Type *t2 = typename(&tok, tok);
+        *rest = skip(tok, ")");
+        return new_num(is_compatible(t1, t2), start);
     }
 
     if (equal(tok, "__builtin_reg_class"))

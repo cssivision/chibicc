@@ -253,6 +253,7 @@ struct Type
     int size; // sizeof() value
     int align;
     bool is_unsigned; // unsigned or signed
+    Type *origin;     // for type compatibility check
 
     // Pointer
     Type *base;
@@ -308,6 +309,7 @@ bool equal(Token *tok, char *p);
 bool consume(Token **rest, Token *tok, char *str);
 int64_t const_expr(Token **rest, Token *tok);
 Token *skip(Token *tok, char *op);
+bool is_compatible(Type *t1, Type *t2);
 
 char *format(char *fmt, ...);
 
