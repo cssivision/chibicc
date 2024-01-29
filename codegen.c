@@ -1404,6 +1404,13 @@ void emit_data(Obj *prog)
                         ? MAX(16, var->align)
                         : var->align;
         println("  .align %d", align);
+
+        if (var->is_tentative)
+        {
+            println("  .comm %s, %d, %d", var->name, var->ty->size, align);
+            continue;
+        }
+
         if (var->init_data)
         {
             println("  .data");

@@ -176,6 +176,7 @@ struct Obj
     bool is_inline;
 
     // Global variable
+    bool is_tentative;
     char *init_data;
     Relocation *rel;
 
