@@ -549,6 +549,19 @@ static Node *primary(Token **rest, Token *tok)
     if (tok->kind == TK_IDENT)
     {
         VarScope *vs = find_var(tok);
+
+        if (vs && vs->var && vs->var->is_function)
+        {
+            if (current_fn)
+            {
+                strarray_push(&current_fn->refs, vs->var->name);
+            }
+            else
+            {
+                vs->var->is_root = true;
+            }
+        }
+
         *rest = tok->next;
         if (vs)
         {
@@ -3251,6 +3264,9 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr)
     fn->is_function = true;
     fn->is_definition = !consume(&tok, tok, ";");
     fn->is_static = attr->is_static || (attr->is_inline && !attr->is_extern);
+    fn->is_inline = attr->is_inline;
+    fn->is_root = !(fn->is_static && fn->is_inline);
+
     if (!fn->is_definition)
     {
         return tok;
@@ -3491,6 +3507,42 @@ static Token *parse_typedef(Token *tok, Type *basety)
     return tok;
 }
 
+static Obj *find_func(char *name)
+{
+    Scope *sc = scope;
+    while (sc->next)
+    {
+        sc = sc->next;
+    }
+
+    for (VarScope *sc2 = sc->vars; sc2; sc2 = sc2->next)
+    {
+        if (!strcmp(sc2->name, name) && sc2->var && sc2->var->is_function)
+        {
+            return sc2->var;
+        }
+    }
+    return NULL;
+}
+
+static void mark_live(Obj *var)
+{
+    if (!var->is_function || var->is_live)
+    {
+        return;
+    }
+    var->is_live = true;
+
+    for (int i = 0; i < var->refs.len; i++)
+    {
+        Obj *fn = find_func(var->refs.data[i]);
+        if (fn)
+        {
+            mark_live(fn);
+        }
+    }
+}
+
 // program = (typedef | function-definition | global-variable)*
 Obj *parse(Token *tok)
 {
@@ -3512,6 +3564,14 @@ Obj *parse(Token *tok)
         }
 
         tok = global_variable(tok, basety, &attr);
+    }
+
+    for (Obj *var = globals; var; var = var->next)
+    {
+        if (var->is_root)
+        {
+            mark_live(var);
+        }
     }
     return globals;
 }

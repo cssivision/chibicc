@@ -169,6 +169,7 @@ struct Obj
     bool is_function;
     bool is_definition;
     bool is_static;
+    bool is_inline;
 
     // Global variable
     char *init_data;
@@ -180,6 +181,11 @@ struct Obj
     Obj *va_area;
     Obj *locals;
     int stack_size;
+
+    // Static inline function
+    bool is_live;
+    bool is_root;
+    StringArray refs;
 };
 
 struct Node
