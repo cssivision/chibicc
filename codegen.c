@@ -21,7 +21,7 @@ static int count(void)
     return i++;
 }
 
-static void println(char *fmt, ...)
+__attribute__((format(printf, 1, 2))) static void println(char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);

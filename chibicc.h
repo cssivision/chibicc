@@ -29,6 +29,10 @@ void strarray_push(StringArray *arr, char *s);
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
+#ifndef __GNUC__
+#define __attribute__(x)
+#endif
+
 typedef struct Type Type;
 typedef struct Token Token;
 typedef struct Obj Obj;
@@ -307,10 +311,10 @@ extern Type *ty_ulong;
 extern Type *ty_float;
 extern Type *ty_double;
 
-void error(char *fmt, ...);
-void error_tok(Token *tok, char *fmt, ...);
-void error_at(char *loc, char *fmt, ...);
-void warn_tok(Token *tok, char *fmt, ...);
+_Noreturn void error(char *fmt, ...) __attribute__((format(printf, 1, 2)));
+_Noreturn void error_at(char *loc, char *fmt, ...) __attribute__((format(printf, 2, 3)));
+_Noreturn void error_tok(Token *tok, char *fmt, ...) __attribute__((format(printf, 2, 3)));
+void warn_tok(Token *tok, char *fmt, ...) __attribute__((format(printf, 2, 3)));
 bool is_flonum(Type *ty);
 bool is_numeric(Type *ty);
 bool file_exists(char *path);
@@ -321,7 +325,7 @@ int64_t const_expr(Token **rest, Token *tok);
 Token *skip(Token *tok, char *op);
 bool is_compatible(Type *t1, Type *t2);
 
-char *format(char *fmt, ...);
+char *format(char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 Token *tokenize_file(char *path);
 Token *tokenize(File *file);
