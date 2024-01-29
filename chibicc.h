@@ -367,3 +367,4 @@ int display_width(char *p, int len);
 
 extern char *base_file;
 extern StringArray include_paths;
+extern bool opt_fcommon;

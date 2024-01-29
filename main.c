@@ -10,6 +10,7 @@ char *base_file;
 static char *output_file;
 
 static StringArray input_paths;
+bool opt_fcommon = true;
 static StringArray tmpfiles;
 StringArray include_paths;
 
@@ -115,6 +116,18 @@ static void parse_args(int argc, char **argv)
         if (!strcmp(argv[i], "-S"))
         {
             opt_S = true;
+            continue;
+        }
+
+        if (!strcmp(argv[i], "-fcommon"))
+        {
+            opt_fcommon = true;
+            continue;
+        }
+
+        if (!strcmp(argv[i], "-fno-common"))
+        {
+            opt_fcommon = false;
             continue;
         }
 
