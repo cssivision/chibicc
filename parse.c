@@ -19,6 +19,7 @@ typedef struct
     bool is_typedef;
     bool is_static;
     bool is_extern;
+    bool is_inline;
     int align;
 } VarAttr;
 
@@ -1766,7 +1767,7 @@ static Type *enum_specifier(Token **rest, Token *tok)
 
 // declspec = ( "void" | "int" | "char" | _Bool | "long"
 //                  | "signed" | "unsigned"
-//                  | "typedef" | "static" | "extern"
+//                  | "typedef" | "static" | "extern" | inline
 //                  | struct-decl | union_decl  | typedef-name
 //                  | enum-specifier | typeof-specifier
 //                  | "const" | "volatile" | "auto" | "register" | "restrict"
@@ -1809,7 +1810,8 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
 
     while (is_typename(tok))
     {
-        if (equal(tok, "typedef") || equal(tok, "static") || equal(tok, "extern"))
+        if (equal(tok, "typedef") || equal(tok, "static") ||
+            equal(tok, "extern") || equal(tok, "inline"))
         {
             if (!attr)
             {
@@ -1823,14 +1825,18 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
             {
                 attr->is_static = true;
             }
-            else
+            else if (equal(tok, "extern"))
             {
                 attr->is_extern = true;
             }
-
-            if (attr->is_typedef && attr->is_static + attr->is_extern > 1)
+            else
             {
-                error_tok(tok, "typedef may not be used together with static or extern");
+                attr->is_inline = true;
+            }
+
+            if (attr->is_typedef && attr->is_static + attr->is_extern + attr->is_inline > 1)
+            {
+                error_tok(tok, "typedef may not be used together with static, extern or inline");
             }
             tok = tok->next;
             continue;
@@ -3136,7 +3142,7 @@ static bool is_typename(Token *tok)
                          "_Alignas", "signed", "unsigned", "const",
                          "volatile", "auto", "register", "restrict",
                          "__restrict", "__restrict__", "_Noreturn",
-                         "float", "double", "typeof"};
+                         "float", "double", "typeof", "inline"};
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
@@ -3244,7 +3250,7 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr)
     Obj *fn = new_gvar(get_ident(ty->name), ty);
     fn->is_function = true;
     fn->is_definition = !consume(&tok, tok, ";");
-    fn->is_static = attr->is_static;
+    fn->is_static = attr->is_static || (attr->is_inline && !attr->is_extern);
     if (!fn->is_definition)
     {
         return tok;
