@@ -1,5 +1,14 @@
 #include "chibicc.h"
 
+typedef enum
+{
+    FILE_NONE,
+    FILE_C,
+    FILE_ASM,
+    FILE_OBJ
+} FileType;
+
+static FileType opt_x;
 static bool opt_S;
 static bool opt_E;
 static bool opt_c;
@@ -24,7 +33,7 @@ static void usage(int status)
 static bool take_arg(char *arg)
 {
 
-    char *x[] = {"-o", "-I", "-idirafter", "include"};
+    char *x[] = {"-o", "-I", "-idirafter", "-include", "-x"};
     for (int i = 0; i < sizeof(x) / sizeof(*x); i++)
     {
         if (!strcmp(arg, x[i]))
@@ -58,6 +67,23 @@ static void define(char *str)
     {
         define_macro(str, "1");
     }
+}
+
+static FileType parse_opt_x(char *s)
+{
+    if (!strcmp(s, "c"))
+    {
+        return FILE_C;
+    }
+    if (!strcmp(s, "assembler"))
+    {
+        return FILE_ASM;
+    }
+    if (!strcmp(s, "none"))
+    {
+        return FILE_NONE;
+    }
+    error("<command line>: unknown argument for -x: %s", s);
 }
 
 static void parse_args(int argc, char **argv)
@@ -135,6 +161,18 @@ static void parse_args(int argc, char **argv)
         if (!strcmp(argv[i], "-c"))
         {
             opt_c = true;
+            continue;
+        }
+
+        if (!strcmp(argv[i], "-x"))
+        {
+            opt_x = parse_opt_x(argv[++i]);
+            continue;
+        }
+
+        if (!strncmp(argv[i], "-x", 2))
+        {
+            opt_x = parse_opt_x(argv[i] + 2);
             continue;
         }
 
@@ -536,6 +574,27 @@ static void run_linker(StringArray *inputs, char *output)
     run_subprocess(arr.data);
 }
 
+static FileType get_file_type(char *s)
+{
+    if (endswith(s, ".o"))
+    {
+        return FILE_OBJ;
+    }
+    if (opt_x != FILE_NONE)
+    {
+        return opt_x;
+    }
+    if (endswith(s, ".c"))
+    {
+        return FILE_C;
+    }
+    if (endswith(s, ".s"))
+    {
+        return FILE_ASM;
+    }
+    error("<command line>: unknown file extension: %s", s);
+}
+
 int main(int argc, char **argv)
 {
     atexit(cleanup);
@@ -574,15 +633,17 @@ int main(int argc, char **argv)
             output = replace_extn(input, ".o");
         }
 
+        FileType type = get_file_type(input);
+
         // Handle .o
-        if (endswith(input, ".o"))
+        if (type == FILE_OBJ)
         {
             strarray_push(&ld_args, input);
             continue;
         }
 
         // Handle .s
-        if (endswith(input, ".s"))
+        if (type == FILE_ASM)
         {
             if (!opt_S)
             {
@@ -592,10 +653,7 @@ int main(int argc, char **argv)
         }
 
         // Handle .c
-        if (!endswith(input, ".c") && strcmp(input, "-"))
-        {
-            error("unknown file extension: %s", input);
-        }
+        assert(type == FILE_C);
 
         // Just preprocess
         if (opt_E)
