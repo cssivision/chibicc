@@ -9,6 +9,7 @@ static char *opt_o;
 char *base_file;
 static char *output_file;
 
+static StringArray opt_include;
 static StringArray input_paths;
 bool opt_fcommon = true;
 static StringArray tmpfiles;
@@ -23,7 +24,7 @@ static void usage(int status)
 static bool take_arg(char *arg)
 {
 
-    char *x[] = {"-o", "-I", "-idirafter"};
+    char *x[] = {"-o", "-I", "-idirafter", "include"};
     for (int i = 0; i < sizeof(x) / sizeof(*x); i++)
     {
         if (!strcmp(arg, x[i]))
@@ -140,6 +141,12 @@ static void parse_args(int argc, char **argv)
         if (!strncmp(argv[i], "-I", 2))
         {
             strarray_push(&include_paths, argv[i] + 2);
+            continue;
+        }
+
+        if (!strcmp(argv[i], "-include"))
+        {
+            strarray_push(&opt_include, argv[++i]);
             continue;
         }
 
@@ -310,13 +317,60 @@ static void print_tokens(Token *tok)
     fprintf(out, "\n");
 }
 
-static void cc1(void)
+static Token *append_tokens(Token *tok1, Token *tok2)
 {
-    Token *tok = tokenize_file(base_file);
+    if (!tok1 || tok1->kind == TK_EOF)
+    {
+        return tok2;
+    }
+
+    Token *t = tok1;
+    while (t->next->kind != TK_EOF)
+    {
+        t = t->next;
+    }
+    t->next = tok2;
+    return tok1;
+}
+
+static Token *must_tokenize_file(char *path)
+{
+    Token *tok = tokenize_file(path);
     if (!tok)
     {
-        error("%s: %s", base_file, strerror(errno));
+        error("%s: %s", path, strerror(errno));
     }
+    return tok;
+}
+
+static void cc1(void)
+{
+    Token *tok = NULL;
+
+    // Process -include option
+    for (int i = 0; i < opt_include.len; i++)
+    {
+        char *incl = opt_include.data[i];
+
+        char *path;
+        if (file_exists(incl))
+        {
+            path = incl;
+        }
+        else
+        {
+            path = search_include_paths(incl);
+            if (!path)
+            {
+                error("-include: %s: %s", incl, strerror(errno));
+            }
+        }
+        Token *tok2 = must_tokenize_file(path);
+        tok = append_tokens(tok, tok2);
+    }
+
+    Token *tok2 = must_tokenize_file(base_file);
+    tok = append_tokens(tok, tok2);
     tok = preprocess(tok);
     // If -E is given, print out preprocessed C code as a result.
     if (opt_E)

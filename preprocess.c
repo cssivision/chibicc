@@ -906,7 +906,7 @@ static Token *include_file(Token *tok, char *path, Token *filename_tok)
     return append(tok2, tok);
 }
 
-static char *search_include_paths(char *filename)
+char *search_include_paths(char *filename)
 {
     for (int i = 0; i < include_paths.len; i++)
     {

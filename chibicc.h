@@ -351,6 +351,7 @@ void init_macros(void);
 void define_macro(char *name, char *buf);
 void undef_macro(char *name);
 Token *preprocess(Token *tok);
+char *search_include_paths(char *filename);
 
 //
 // unicode.c
