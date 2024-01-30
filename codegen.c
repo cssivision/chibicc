@@ -161,6 +161,14 @@ void gen_addr(Node *node)
             return;
         }
 
+        // Thread-local variable
+        if (node->var->is_tls)
+        {
+            println("  mov %%fs:0, %%rax");
+            println("  add $%s@tpoff, %%rax", node->var->name);
+            return;
+        }
+
         // Here, we generate an absolute address of a function or a global
         // variable. Even though they exist at a certain address at runtime,
         // their addresses are not known at link-time for the following
@@ -1413,7 +1421,14 @@ void emit_data(Obj *prog)
 
         if (var->init_data)
         {
-            println("  .data");
+            if (var->is_tls)
+            {
+                println("  .section .tdata,\"awT\",@progbits");
+            }
+            else
+            {
+                println("  .data");
+            }
             println("%s:", var->name);
             Relocation *rel = var->rel;
             int pos = 0;
@@ -1433,7 +1448,15 @@ void emit_data(Obj *prog)
             continue;
         }
 
-        println("  .bss");
+        // .bss or .tbss
+        if (var->is_tls)
+        {
+            println("  .section .tbss,\"awT\",@nobits");
+        }
+        else
+        {
+            println("  .bss");
+        }
         println("%s:", var->name);
         println("  .zero %d", var->ty->size);
     }

@@ -20,6 +20,7 @@ typedef struct
     bool is_static;
     bool is_extern;
     bool is_inline;
+    bool is_tls;
     int align;
 } VarAttr;
 
@@ -1781,6 +1782,7 @@ static Type *enum_specifier(Token **rest, Token *tok)
 // declspec = ( "void" | "int" | "char" | _Bool | "long"
 //                  | "signed" | "unsigned"
 //                  | "typedef" | "static" | "extern" | inline
+//                  | "_Thread_local" | "__thread"
 //                  | struct-decl | union_decl  | typedef-name
 //                  | enum-specifier | typeof-specifier
 //                  | "const" | "volatile" | "auto" | "register" | "restrict"
@@ -1824,7 +1826,8 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
     while (is_typename(tok))
     {
         if (equal(tok, "typedef") || equal(tok, "static") ||
-            equal(tok, "extern") || equal(tok, "inline"))
+            equal(tok, "extern") || equal(tok, "inline") ||
+            equal(tok, "_Thread_local") || equal(tok, "__thread"))
         {
             if (!attr)
             {
@@ -1842,14 +1845,18 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr)
             {
                 attr->is_extern = true;
             }
-            else
+            else if (equal(tok, "inline"))
             {
                 attr->is_inline = true;
             }
-
-            if (attr->is_typedef && attr->is_static + attr->is_extern + attr->is_inline > 1)
+            else
             {
-                error_tok(tok, "typedef may not be used together with static, extern or inline");
+                attr->is_tls = true;
+            }
+
+            if (attr->is_typedef && attr->is_static + attr->is_extern + attr->is_inline + attr->is_tls > 1)
+            {
+                error_tok(tok, "typedef may not be used together with static, extern inline, __thread or _Thread_local");
             }
             tok = tok->next;
             continue;
@@ -3155,7 +3162,8 @@ static bool is_typename(Token *tok)
                          "_Alignas", "signed", "unsigned", "const",
                          "volatile", "auto", "register", "restrict",
                          "__restrict", "__restrict__", "_Noreturn",
-                         "float", "double", "typeof", "inline"};
+                         "float", "double", "typeof", "inline",
+                         "_Thread_local", "__thread"};
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
     {
@@ -3474,6 +3482,7 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr)
         Obj *var = new_gvar(get_ident(ty->name), ty);
         var->is_definition = !attr->is_extern;
         var->is_static = attr->is_static;
+        var->is_tls = attr->is_tls;
         if (attr->align)
         {
             var->align = attr->align;
@@ -3482,7 +3491,7 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr)
         {
             gvar_initializer(&tok, tok->next, var);
         }
-        else if (!attr->is_extern)
+        else if (!attr->is_extern && !attr->is_tls)
         {
             var->is_tentative = true;
         }

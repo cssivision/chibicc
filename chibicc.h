@@ -173,6 +173,7 @@ struct Obj
     bool is_function;
     bool is_definition;
     bool is_static;
+    bool is_tls;
     bool is_inline;
 
     // Global variable
