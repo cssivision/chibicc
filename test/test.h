@@ -10,3 +10,4 @@ int strncmp(char *p, char *q, long n);
 int memcmp(char *p, char *q, long n);
 void exit(int n);
 long strlen(char *s);
+void *memcpy(void *dest, void *src, long n);

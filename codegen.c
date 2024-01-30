@@ -604,6 +604,35 @@ static void copy_ret_buffer(Obj *var)
     }
 }
 
+static void builtin_alloca(void)
+{
+    // Align size to 16 bytes.
+    println("  add $15, %%rdi");
+    println("  and $0xfffffff0, %%edi");
+
+    // Shift the temporary area by %rdi.
+    println("  mov %d(%%rbp), %%rcx", current_fn->alloca_bottom->offset);
+    println("  sub %%rsp, %%rcx");
+    println("  mov %%rsp, %%rax");
+    println("  sub %%rdi, %%rsp");
+    println("  mov %%rsp, %%rdx");
+    println("1:");
+    println("  cmp $0, %%rcx");
+    println("  je 2f");
+    println("  mov (%%rax), %%r8b");
+    println("  mov %%r8b, (%%rdx)");
+    println("  inc %%rdx");
+    println("  inc %%rax");
+    println("  dec %%rcx");
+    println("  jmp 1b");
+    println("2:");
+
+    // Move alloca_bottom pointer.
+    println("  mov %d(%%rbp), %%rax", current_fn->alloca_bottom->offset);
+    println("  sub %%rdi, %%rax");
+    println("  mov %%rax, %d(%%rbp)", current_fn->alloca_bottom->offset);
+}
+
 void gen_expr(Node *node)
 {
     println("  .loc %d %d", node->tok->file->file_no, node->tok->line_no);
@@ -792,6 +821,14 @@ void gen_expr(Node *node)
         return;
     case ND_FUNCCALL:
     {
+        if (node->lhs->kind == ND_VAR && !strcmp(node->lhs->var->name, "alloca"))
+        {
+            gen_expr(node->args);
+            println("  mov %%rax, %%rdi");
+            builtin_alloca();
+            return;
+        }
+
         int stack_args = push_args(node);
         gen_expr(node->lhs);
 
@@ -1534,6 +1571,7 @@ void emit_text(Obj *prog)
         println("  push %%rbp");
         println("  mov %%rsp, %%rbp");
         println("  sub $%d, %%rsp", fn->stack_size);
+        println("  mov %%rsp, %d(%%rbp)", fn->alloca_bottom->offset);
 
         // Save arg registers if function is variadic
         if (fn->va_area)

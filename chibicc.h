@@ -185,6 +185,7 @@ struct Obj
     Node *body;
     Obj *params;
     Obj *va_area;
+    Obj *alloca_bottom;
     Obj *locals;
     int stack_size;
 
