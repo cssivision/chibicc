@@ -5,7 +5,9 @@ typedef enum
     FILE_NONE,
     FILE_C,
     FILE_ASM,
-    FILE_OBJ
+    FILE_OBJ,
+    FILE_AR,
+    FILE_DSO
 } FileType;
 
 static FileType opt_x;
@@ -599,13 +601,22 @@ static void run_linker(StringArray *inputs, char *output)
 
 static FileType get_file_type(char *s)
 {
-    if (endswith(s, ".o"))
-    {
-        return FILE_OBJ;
-    }
     if (opt_x != FILE_NONE)
     {
         return opt_x;
+    }
+
+    if (endswith(s, ".a"))
+    {
+        return FILE_AR;
+    }
+    if (endswith(s, ".so"))
+    {
+        return FILE_DSO;
+    }
+    if (endswith(s, ".o"))
+    {
+        return FILE_OBJ;
     }
     if (endswith(s, ".c"))
     {
@@ -664,8 +675,8 @@ int main(int argc, char **argv)
 
         FileType type = get_file_type(input);
 
-        // Handle .o
-        if (type == FILE_OBJ)
+        // Handle .o or .a
+        if (type == FILE_OBJ || type == FILE_AR || type == FILE_DSO)
         {
             strarray_push(&ld_args, input);
             continue;
