@@ -200,6 +200,7 @@ struct Node
     NodeKind kind;
     Node *next;
     Type *ty;
+    Type *func_ty;
     Token *tok; // Representative token
     Node *lhs;
     Node *rhs;
@@ -251,6 +252,7 @@ typedef enum
     TY_PTR,
     TY_FUNC,
     TY_ARRAY,
+    TY_VLA, // variable-length array
     TY_CHAR,
     TY_VOID,
     TY_BOOL,
@@ -282,6 +284,10 @@ struct Type
     // Array
     int array_len;
 
+    // Variable-length array
+    Node *vla_len; // # of elements
+    Obj *vla_size; // sizeof() value
+
     // Function
     Type *return_ty;
     Type *params;
@@ -301,6 +307,8 @@ Type *copy_type(Type *ty);
 Type *enum_type();
 Type *struct_type();
 Type *array_of(Type *base, int len);
+Type *vla_of(Type *base, Node *len);
+
 extern Type *ty_int;
 extern Type *ty_char;
 extern Type *ty_long;

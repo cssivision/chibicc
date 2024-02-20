@@ -76,6 +76,14 @@ Type *array_of(Type *base, int len)
     return ty;
 }
 
+Type *vla_of(Type *base, Node *len)
+{
+    Type *ty = new_type(TY_VLA, 8, 8);
+    ty->base = base;
+    ty->vla_len = len;
+    return ty;
+}
+
 Type *get_common_type(Type *ty1, Type *ty2)
 {
     if (ty1->base)
@@ -215,7 +223,7 @@ void add_type(Node *node)
         return;
     case ND_FUNCCALL:
     {
-        node->ty = ty_long;
+        node->ty = node->func_ty->return_ty;
         return;
     }
     case ND_MEMBER:

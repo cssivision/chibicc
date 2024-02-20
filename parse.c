@@ -13,6 +13,8 @@ static char *cont_label;
 // a switch statement. Otherwise, NULL.
 static Node *current_switch;
 
+static Obj *builtin_alloca;
+
 // Variable attributes such as typedef or extern.
 typedef struct
 {
@@ -78,6 +80,7 @@ static Node *compound_stmt(Token **rest, Token *tok);
 static Node *assign(Token **rest, Token *tok);
 static Type *declarator(Token **rest, Token *tok, Type *ty);
 static Type *declspec(Token **rest, Token *tok, VarAttr *attr);
+static bool is_const_expr(Node *node);
 
 // Scope for local variables, global variables, typedefs
 // or enum constants
@@ -461,16 +464,22 @@ static Node *primary(Token **rest, Token *tok)
     {
         tok = tok->next->next;
         Type *ty = typename(&tok, tok);
-        tok = skip(tok, ")");
-        *rest = tok;
+        *rest = skip(tok, ")");
+        if (ty->kind == TY_VLA)
+        {
+            return new_var_node(ty->vla_size, tok);
+        }
         return new_ulong(ty->size, start);
     }
 
     if (equal(tok, "sizeof"))
     {
-        Node *node = unary(&tok, tok->next);
+        Node *node = unary(rest, tok->next);
         add_type(node);
-        *rest = tok;
+        if (node->ty->kind == TY_VLA)
+        {
+            return new_var_node(node->ty->vla_size, tok);
+        }
         return new_ulong(node->ty->size, tok);
     }
 
@@ -2106,11 +2115,60 @@ static Type *array_dimensions(Token **rest, Token *tok, Type *ty)
         return array_of(ty, -1);
     }
 
-    int len = const_expr(&tok, tok);
+    Node *expr = conditional(&tok, tok);
     tok = skip(tok, "]");
-    ty = type_suffix(&tok, tok, ty);
-    *rest = tok;
-    return array_of(ty, len);
+    ty = type_suffix(rest, tok, ty);
+    if (ty->kind == TY_VLA || !is_const_expr(expr))
+    {
+        return vla_of(ty, expr);
+    }
+    return array_of(ty, eval(expr));
+}
+
+static bool is_const_expr(Node *node)
+{
+    add_type(node);
+
+    switch (node->kind)
+    {
+    case ND_ADD:
+    case ND_SUB:
+    case ND_MUL:
+    case ND_DIV:
+    case ND_BITAND:
+    case ND_BITOR:
+    case ND_BITXOR:
+    case ND_SHL:
+    case ND_SHR:
+    case ND_EQ:
+    case ND_NE:
+    case ND_LT:
+    case ND_LE:
+    case ND_LOGAND:
+    case ND_LOGOR:
+    {
+        return is_const_expr(node->lhs) && is_const_expr(node->rhs);
+    }
+    case ND_COND:
+    {
+        if (!is_const_expr(node->cond))
+        {
+            return false;
+        }
+        return is_const_expr(eval(node->cond) ? node->then : node->els);
+    }
+    case ND_COMMA:
+        return is_const_expr(node->rhs);
+    case ND_NEG:
+    case ND_NOT:
+    case ND_BITNOT:
+    case ND_CAST:
+        return is_const_expr(node->lhs);
+    case ND_NUM:
+        return true;
+    }
+
+    return false;
 }
 
 // type-suffix = ("(" func-params? ")")?
@@ -2819,6 +2877,39 @@ static Node *lvar_initializer(Token **rest, Token *tok, Obj *var)
     return new_binary(ND_COMMA, lhs, create_lvar_init(init, tok), tok);
 }
 
+// Generate code for computing a VLA size.
+static Node *compute_vla_size(Type *ty, Token *tok)
+{
+    Node *node = new_node(ND_NULL_EXPR, tok);
+    if (ty->base)
+        node = new_binary(ND_COMMA, node, compute_vla_size(ty->base, tok), tok);
+
+    if (ty->kind != TY_VLA)
+        return node;
+
+    Node *base_sz;
+    if (ty->base->kind == TY_VLA)
+        base_sz = new_var_node(ty->base->vla_size, tok);
+    else
+        base_sz = new_num(ty->base->size, tok);
+
+    ty->vla_size = new_lvar("", ty_ulong);
+    Node *expr = new_binary(ND_ASSIGN, new_var_node(ty->vla_size, tok),
+                            new_binary(ND_MUL, ty->vla_len, base_sz, tok),
+                            tok);
+    return new_binary(ND_COMMA, node, expr, tok);
+}
+
+static Node *new_alloca(Node *sz)
+{
+    Node *node = new_unary(ND_FUNCCALL, new_var_node(builtin_alloca, sz->tok), sz->tok);
+    node->func_ty = builtin_alloca->ty;
+    node->ty = builtin_alloca->ty->return_ty;
+    node->args = sz;
+    add_type(sz);
+    return node;
+}
+
 // declaration = (declarator ("=" assign)? (",", declarator ("=" assign)?)*)? ";"
 static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr)
 {
@@ -2859,12 +2950,35 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr)
             continue;
         }
 
+        // Generate code for computing a VLA size. We need to do this
+        // even if ty is not VLA because ty may be a pointer to VLA
+        // (e.g. int (*foo)[n][m] where n and m are variables.)
+        cur = cur->next = new_unary(ND_EXPR_STMT, compute_vla_size(ty, tok), tok);
+
+        if (ty->kind == TY_VLA)
+        {
+            if (equal(tok, "="))
+            {
+                error_tok(tok, "variable-sized object may not be initialized");
+            }
+
+            // Variable length arrays (VLAs) are translated to alloca() calls.
+            // For example, `int x[n+2]` is translated to `tmp = n + 2,
+            // x = alloca(tmp)`.
+            Obj *var = new_lvar(get_ident(ty->name), ty);
+            Token *tok = ty->name;
+            Node *expr = new_binary(ND_ASSIGN, new_var_node(var, tok),
+                                    new_alloca(new_var_node(ty->vla_size, tok)),
+                                    tok);
+            cur = cur->next = new_unary(ND_EXPR_STMT, expr, tok);
+            continue;
+        }
+
         Obj *var = new_lvar(get_ident(ty->name), ty);
         if (attr && attr->align)
         {
             var->align = attr->align;
         }
-
         if (!equal(tok, "="))
         {
             continue;
@@ -3597,8 +3711,8 @@ static void declare_builtin_functions(void)
 {
     Type *ty = func_type(pointer_to(ty_void));
     ty->params = copy_type(ty_int);
-    Obj *builtin = new_gvar("alloca", ty);
-    builtin->is_definition = false;
+    builtin_alloca = new_gvar("alloca", ty);
+    builtin_alloca->is_definition = false;
 }
 
 // program = (typedef | function-definition | global-variable)*
