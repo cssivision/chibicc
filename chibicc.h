@@ -126,6 +126,7 @@ typedef enum
     ND_COND,     // "?:"
     ND_NUM,      // Integer
     ND_VAR,      // Variable
+    ND_VLA_PTR,  // VLA designator
     ND_FUNCCALL, // Function call
     ND_COMMA,    // ,
     ND_MEMBER,   // .

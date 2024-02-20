@@ -950,11 +950,19 @@ static Node *new_add(Node *lhs, Node *rhs, Token *tok)
         error_tok(tok, "invalid operands");
     }
 
+    // Canonicalize `num + ptr` to `ptr + num`.
     if (!lhs->ty->base && rhs->ty->base)
     {
         Node *tmp = lhs;
         lhs = rhs;
         rhs = tmp;
+    }
+
+    // VLA + num
+    if (lhs->ty->base->kind == TY_VLA)
+    {
+        rhs = new_binary(ND_MUL, rhs, new_var_node(lhs->ty->base->vla_size, tok), tok);
+        return new_binary(ND_ADD, lhs, rhs, tok);
     }
 
     // ptr + num
@@ -978,6 +986,16 @@ static Node *new_sub(Node *lhs, Node *rhs, Token *tok)
     if (lhs->ty->base && is_integer(rhs->ty))
     {
         rhs = new_binary(ND_MUL, rhs, new_long(lhs->ty->base->size, tok), tok);
+        add_type(rhs);
+        Node *node = new_binary(ND_SUB, lhs, rhs, tok);
+        node->ty = lhs->ty;
+        return node;
+    }
+
+    // VLA - num
+    if (lhs->ty->base->kind == TY_VLA)
+    {
+        rhs = new_binary(ND_MUL, rhs, new_var_node(lhs->ty->base->vla_size, tok), tok);
         add_type(rhs);
         Node *node = new_binary(ND_SUB, lhs, rhs, tok);
         node->ty = lhs->ty;
@@ -2910,6 +2928,13 @@ static Node *new_alloca(Node *sz)
     return node;
 }
 
+static Node *new_vla_ptr(Obj *var, Token *tok)
+{
+    Node *node = new_node(ND_VLA_PTR, tok);
+    node->var = var;
+    return node;
+}
+
 // declaration = (declarator ("=" assign)? (",", declarator ("=" assign)?)*)? ";"
 static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr)
 {
@@ -2967,7 +2992,7 @@ static Node *declaration(Token **rest, Token *tok, Type *basety, VarAttr *attr)
             // x = alloca(tmp)`.
             Obj *var = new_lvar(get_ident(ty->name), ty);
             Token *tok = ty->name;
-            Node *expr = new_binary(ND_ASSIGN, new_var_node(var, tok),
+            Node *expr = new_binary(ND_ASSIGN, new_vla_ptr(var, tok),
                                     new_alloca(new_var_node(ty->vla_size, tok)),
                                     tok);
             cur = cur->next = new_unary(ND_EXPR_STMT, expr, tok);
