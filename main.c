@@ -23,6 +23,7 @@ static StringArray input_paths;
 bool opt_fcommon = true;
 static StringArray tmpfiles;
 StringArray include_paths;
+static StringArray ld_extra_args;
 
 static void usage(int status)
 {
@@ -215,6 +216,12 @@ static void parse_args(int argc, char **argv)
         if (!strncmp(argv[i], "-l", 2))
         {
             strarray_push(&input_paths, argv[i]);
+            continue;
+        }
+
+        if (!strcmp(argv[i], "-s"))
+        {
+            strarray_push(&ld_extra_args, argv[++i]);
             continue;
         }
 
@@ -567,6 +574,11 @@ static void run_linker(StringArray *inputs, char *output)
     strarray_push(&arr, "-L/usr/lib/x86_64-redhat-linux");
     strarray_push(&arr, "-L/usr/lib");
     strarray_push(&arr, "-L/lib");
+
+    for (int i = 0; i < ld_extra_args.len; i++)
+    {
+        strarray_push(&arr, ld_extra_args.data[i]);
+    }
 
     for (int i = 0; i < inputs->len; i++)
     {

@@ -1459,7 +1459,6 @@ void emit_data(Obj *prog)
         int align = (var->ty->kind == TY_ARRAY && var->ty->size >= 16)
                         ? MAX(16, var->align)
                         : var->align;
-        println("  .align %d", align);
 
         if (opt_fcommon && var->is_tentative)
         {
@@ -1475,6 +1474,9 @@ void emit_data(Obj *prog)
             }
             else
             {
+                println("  .type %s, @object", var->name);
+                println("  .size %s, %d", var->name, var->ty->size);
+                println("  .align %d", align);
                 println("  .data");
             }
             println("%s:", var->name);
@@ -1505,6 +1507,7 @@ void emit_data(Obj *prog)
         {
             println("  .bss");
         }
+        println("  .align %d", align);
         println("%s:", var->name);
         println("  .zero %d", var->ty->size);
     }
@@ -1576,6 +1579,7 @@ void emit_text(Obj *prog)
         }
 
         println("  .text");
+        println("  .type %s, @function", fn->name);
         println("%s:", fn->name);
         current_fn = fn;
 
